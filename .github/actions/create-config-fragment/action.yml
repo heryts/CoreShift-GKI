@@ -1,0 +1,236 @@
+name: Create private config fragment
+description: Generate private.fragment and private.required from workflow inputs.
+inputs:
+  ikconfig:
+    required: true
+    description: Enable IKCONFIG.
+  container_core:
+    required: true
+    description: Enable core container primitives.
+  container_ipc:
+    required: true
+    description: Enable IPC container primitives.
+  mount_filesystems:
+    required: true
+    description: Enable mount filesystem helpers.
+  container_networking:
+    required: true
+    description: Enable container networking helpers.
+  fq_codel_features:
+    required: true
+    description: Enable FQ/FQ_CODEL features.
+  performance_features:
+    required: true
+    description: Enable performance features.
+  debug_features:
+    required: true
+    description: Enable debug features.
+  heavy_debug_features:
+    required: true
+    description: Enable heavy debug features.
+  susfs:
+    required: true
+    description: Add SUSFS4KSU configs.
+  baseband_guard:
+    required: true
+    description: Add Baseband Guard config.
+  kernel_version:
+    required: true
+    description: Kernel version used to select SUSFS patch metadata.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel/common
+
+        : > private.fragment
+        : > private.required
+
+        add_config() {
+          key="$1"
+          val="$2"
+
+          if [ "$val" = "y" ]; then
+            printf 'CONFIG_%s=y\n' "$key" >> private.fragment
+            printf 'CONFIG_%s=y\n' "$key" >> private.required
+          elif [ "$val" = "m" ]; then
+            printf 'CONFIG_%s=m\n' "$key" >> private.fragment
+            printf 'CONFIG_%s=m\n' "$key" >> private.required
+          else
+            printf 'CONFIG_%s=%s\n' "$key" "$val" >> private.fragment
+            printf 'CONFIG_%s=%s\n' "$key" "$val" >> private.required
+          fi
+        }
+
+        add_str_config() {
+          key="$1"
+          val="$2"
+
+          printf 'CONFIG_%s="%s"\n' "$key" "$val" >> private.fragment
+          printf 'CONFIG_%s="%s"\n' "$key" "$val" >> private.required
+        }
+
+        if [ "${{ inputs.ikconfig }}" = "on" ]; then
+          add_config IKCONFIG y
+          add_config IKCONFIG_PROC y
+        fi
+
+        if [ "${{ inputs.container_core }}" = "on" ]; then
+          add_config NAMESPACES y
+          add_config USER_NS y
+          add_config UTS_NS y
+          add_config IPC_NS y
+          add_config NET_NS y
+          add_config PID_NS y
+
+          add_config CGROUPS y
+          add_config CGROUP_PIDS y
+          add_config CGROUP_DEVICE y
+
+          add_config DEVTMPFS y
+
+          add_config SECCOMP y
+          add_config SECCOMP_FILTER y
+        fi
+
+        if [ "${{ inputs.container_ipc }}" = "on" ]; then
+          add_config SYSCTL y
+          add_config SYSVIPC y
+          add_config SYSVIPC_SYSCTL y
+          add_config POSIX_MQUEUE y
+          add_config POSIX_MQUEUE_SYSCTL y
+        fi
+
+        if [ "${{ inputs.mount_filesystems }}" = "on" ]; then
+          add_config TMPFS y
+          add_config TMPFS_XATTR y
+          add_config TMPFS_POSIX_ACL y
+          add_config OVERLAY_FS y
+          add_config FUSE_FS y
+        fi
+
+        if [ "${{ inputs.container_networking }}" = "on" ]; then
+          add_config TUN y
+          add_config VETH y
+          add_config BRIDGE y
+          add_config BRIDGE_NETFILTER y
+
+          add_config NETFILTER y
+          add_config NETFILTER_ADVANCED y
+          add_config NETFILTER_XTABLES y
+
+          add_config NETFILTER_XT_TARGET_MASQUERADE y
+          add_config NETFILTER_XT_TARGET_REDIRECT y
+          add_config NETFILTER_XT_TARGET_MARK y
+
+          add_config NETFILTER_XT_MATCH_CONNTRACK y
+          add_config NETFILTER_XT_MATCH_STATE y
+          add_config NETFILTER_XT_MATCH_MARK y
+          add_config NETFILTER_XT_MATCH_MULTIPORT y
+          add_config NETFILTER_XT_MATCH_OWNER y
+
+          add_config NF_CONNTRACK y
+          add_config NF_NAT y
+          add_config IP_NF_IPTABLES y
+          add_config IP_NF_FILTER y
+          add_config IP_NF_NAT y
+          add_config IP_NF_TARGET_MASQUERADE y
+        fi
+
+        if [ "${{ inputs.fq_codel_features }}" = "on" ]; then
+          add_config NET_SCH_FQ y
+          add_config NET_SCH_FQ_CODEL y
+          add_str_config DEFAULT_TCP_CONG cubic
+        fi
+
+        if [ "${{ inputs.performance_features }}" = "on" ]; then
+          add_config PSI y
+          add_config TCP_CONG_BBR y
+          add_config NET_SCH_FQ y
+          add_config DEFAULT_BBR y
+          add_str_config DEFAULT_TCP_CONG bbr
+        fi
+
+        if [ "${{ inputs.debug_features }}" = "on" ]; then
+          add_config KPROBES y
+          add_config KPROBE_EVENTS y
+          add_config UPROBES y
+          add_config FTRACE y
+          add_config FUNCTION_TRACER y
+          add_config DYNAMIC_FTRACE y
+        fi
+
+        if [ "${{ inputs.heavy_debug_features }}" = "on" ]; then
+          add_config KALLSYMS y
+          add_config KALLSYMS_ALL y
+          add_config KASAN y
+          add_config KASAN_HW_TAGS y
+          add_config BTRFS_FS y
+        fi
+
+        if [ "${{ inputs.susfs }}" = "on" ]; then
+          case "${{ inputs.kernel_version }}" in
+            5.10)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
+              ;;
+            6.1)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android14-6.1"
+              ;;
+            6.6)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
+              ;;
+            *)
+              echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
+              exit 1
+              ;;
+          esac
+
+          echo "== SUSFS config scan: $SUSFS_PATCH_DIR =="
+
+          if [ ! -d "$SUSFS_PATCH_DIR" ]; then
+            echo "::error::missing SUSFS patch directory: $SUSFS_PATCH_DIR"
+            exit 1
+          fi
+
+          SUSFS_CONFIGS="$(
+            { grep -RhoE '^\+[[:space:]]*config[[:space:]]+KSU_SUSFS[A-Z0-9_]*' "$SUSFS_PATCH_DIR" 2>/dev/null || true; } |
+            sed -E 's/^\+[[:space:]]*config[[:space:]]+//' |
+            sort -u
+          )"
+
+          if [ -z "$SUSFS_CONFIGS" ]; then
+            echo "::warning::No required SUSFS CONFIG_* names found in selected patches/Kconfig."
+          else
+            echo "$SUSFS_CONFIGS" | while read -r key; do
+              [ -z "$key" ] && continue
+              add_config "$key" y
+            done
+          fi
+        fi
+
+        if [ "${{ inputs.baseband_guard }}" = "on" ]; then
+          add_config BBG y
+        fi
+
+        echo "== private.fragment =="
+        cat private.fragment
+
+        echo
+        echo "== private.required =="
+        cat private.required
+
+        touch BUILD.bazel
+
+        if ! grep -q 'private.fragment' BUILD.bazel; then
+          {
+            printf '\n'
+            printf 'exports_files(["private.fragment"])\n'
+          } >> BUILD.bazel
+        fi
+
+        echo
+        echo "== BUILD.bazel private fragment export =="
+        grep -n 'private.fragment' BUILD.bazel || true

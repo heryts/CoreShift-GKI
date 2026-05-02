@@ -1,0 +1,33 @@
+name: Setup kernel variables
+description: Select branch and build engine for requested GKI version.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version to build.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "DATE=$(date +'%Y%m%d')" >> "$GITHUB_ENV"
+
+        case "${{ inputs.kernel_version }}" in
+          5.10)
+            echo "BRANCH=common-android12-5.10-lts" >> "$GITHUB_ENV"
+            echo "BUILD_ENGINE=legacy" >> "$GITHUB_ENV"
+            ;;
+          6.1)
+            echo "BRANCH=common-android14-6.1-lts" >> "$GITHUB_ENV"
+            echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
+            ;;
+          6.6)
+            echo "BRANCH=common-android15-6.6-lts" >> "$GITHUB_ENV"
+            echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
+            ;;
+          *)
+            echo "::error::unsupported kernel_version: ${{ inputs.kernel_version }}"
+            exit 1
+            ;;
+        esac

@@ -1,0 +1,120 @@
+name: Init manager
+description: Initialize selected kernel manager.
+inputs:
+  manager:
+    required: true
+    description: Manager submodule name.
+  manager_ref:
+    required: false
+    default: ""
+    description: Optional manager git ref, commit, or tag.
+  susfs:
+    required: true
+    description: Whether SUSFS4KSU patches are enabled.
+  kernel_version:
+    required: true
+    description: Kernel version used for SUSFS manager compatibility selection.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        MANAGER="${{ inputs.manager }}"
+        KERNEL_VERSION="${{ inputs.kernel_version }}"
+        MANAGER_DIR="${GITHUB_WORKSPACE}/manager/${MANAGER}"
+        COMMON_DIR="${GITHUB_WORKSPACE}/kernel/common"
+        SELECTED_MANAGER_REF=""
+        MANAGER_REF_SOURCE="submodule-default"
+
+        git submodule update --init --depth 1 --single-branch "manager/${MANAGER}"
+
+        if [ -n "${{ inputs.manager_ref }}" ]; then
+          SELECTED_MANAGER_REF="${{ inputs.manager_ref }}"
+          MANAGER_REF_SOURCE="explicit"
+        elif [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== SUSFS manager compatibility table =="
+          printf '%s\n' \
+            'manager   kernel  ref' \
+            'KernelSU  5.10    3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
+            'KernelSU  6.1     3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
+            'KernelSU  6.6     3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
+            'KowSU     5.10    cf087d755af8e322e6840d02b082a7b3871726c7' \
+            'KowSU     6.1     cf087d755af8e322e6840d02b082a7b3871726c7' \
+            'KowSU     6.6     cf087d755af8e322e6840d02b082a7b3871726c7'
+
+          case "${MANAGER}:${KERNEL_VERSION}" in
+            KernelSU:5.10|KernelSU:6.1|KernelSU:6.6)
+              SELECTED_MANAGER_REF="3c30f77db1802d68a1cfcfb77d49c92fe93873ac"
+              MANAGER_REF_SOURCE="susfs-default"
+              ;;
+            KowSU:5.10|KowSU:6.1|KowSU:6.6)
+              SELECTED_MANAGER_REF="cf087d755af8e322e6840d02b082a7b3871726c7"
+              MANAGER_REF_SOURCE="susfs-default"
+              ;;
+            *)
+              echo "::error::No SUSFS-compatible default manager ref for manager=${MANAGER}, kernel_version=${KERNEL_VERSION}. Set manager_ref explicitly to override."
+              exit 1
+              ;;
+          esac
+        fi
+
+        echo "manager ref source: $MANAGER_REF_SOURCE"
+        echo "selected manager ref: ${SELECTED_MANAGER_REF:-submodule-default}"
+
+        if [ -n "$SELECTED_MANAGER_REF" ]; then
+          cd "$MANAGER_DIR"
+
+          echo "== pin manager ref =="
+          echo "manager_ref=$SELECTED_MANAGER_REF"
+
+          git fetch --depth=1 origin "$SELECTED_MANAGER_REF" ||
+            git fetch origin "$SELECTED_MANAGER_REF"
+          git checkout FETCH_HEAD
+
+          echo "manager HEAD: $(git rev-parse HEAD)"
+          echo "manager describe: $(git describe --tags --always)"
+        else
+          cd "$MANAGER_DIR"
+          echo "manager HEAD: $(git rev-parse HEAD)"
+          echo "manager describe: $(git describe --tags --always)"
+        fi
+
+        cd "$COMMON_DIR"
+
+        if [ -f "$MANAGER_DIR/kernel/setup.sh" ]; then
+          if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; }; then
+            bash "$MANAGER_DIR/kernel/setup.sh" "$SELECTED_MANAGER_REF"
+          else
+            bash "$MANAGER_DIR/kernel/setup.sh"
+          fi
+        else
+          if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; }; then
+            bash "$MANAGER_DIR/setup.sh" "$SELECTED_MANAGER_REF"
+          else
+            bash "$MANAGER_DIR/setup.sh"
+          fi
+        fi
+
+        KSU_MARKERS="$(
+          find "$COMMON_DIR" \
+            -type f \
+            -path "*/kernel/include/ksu.h" \
+            -print || true
+        )"
+
+        if [ -n "$KSU_MARKERS" ]; then
+          KSU_MARKER="$(printf '%s\n' "$KSU_MARKERS" | sort | head -n 1)"
+          KSU_ROOT="${KSU_MARKER%/kernel/include/ksu.h}"
+
+          echo "integrated KSU_ROOT=$KSU_ROOT"
+          echo "integrated KSU HEAD: $(git -C "$KSU_ROOT" rev-parse HEAD)"
+          echo "integrated KSU describe: $(git -C "$KSU_ROOT" describe --tags --always)"
+        fi
+
+        git config --global user.email "bot@github.com"
+        git config --global user.name "Workflow Bot"
+
+        git add .
+        git commit -m "Integrate ${{ inputs.manager }} and remove dirty tag" || true

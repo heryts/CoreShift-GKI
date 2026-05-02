@@ -1,0 +1,49 @@
+name: Build kernel
+description: Build the selected kernel.
+inputs:
+  lto:
+    required: true
+    description: LTO mode.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel
+
+        JOBS="4"
+        if [ "${{ inputs.lto }}" = "full" ]; then
+          JOBS="2"
+          export LLVM_PARALLEL_LINK_JOBS=1
+          export LLD_PARALLEL_LINK_JOBS=1
+        fi
+
+        export MAKEFLAGS="-j${JOBS}"
+
+        echo "BUILD_ENGINE=$BUILD_ENGINE"
+        echo "LTO=${{ inputs.lto }}"
+        echo "JOBS=$JOBS"
+        echo "MAKEFLAGS=$MAKEFLAGS"
+        if [ "${{ inputs.lto }}" = "full" ]; then
+          echo "LLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS"
+          echo "LLD_PARALLEL_LINK_JOBS=$LLD_PARALLEL_LINK_JOBS"
+        fi
+
+        if [ "$BUILD_ENGINE" = "kleaf" ]; then
+          tools/bazel run \
+            --lto=${{ inputs.lto }} \
+            --defconfig_fragment=//common:private.fragment \
+            //common:kernel_aarch64_dist -- \
+            --dist_dir=out/dist
+        else
+          export BUILD_CONFIG=common/build.config.gki.aarch64
+          export LTO=${{ inputs.lto }}
+          export SKIP_MRPROPER=1
+          export SKIP_CP_KERNEL_HDRS=1
+          export SKIP_UNSTRIPPED_MODULES=1
+          export SKIP_DEBUG_INFO=1
+
+          bash build/build.sh -j"${JOBS}"
+        fi

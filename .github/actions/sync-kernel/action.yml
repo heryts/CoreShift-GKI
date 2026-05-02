@@ -1,0 +1,26 @@
+name: Sync kernel
+description: Sync Android common kernel source for selected branch.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        mkdir kernel
+        cd kernel
+
+        repo init \
+          -u https://android.googlesource.com/kernel/manifest \
+          -b "$BRANCH" \
+          --depth=1 \
+          --quiet
+
+        repo sync \
+          -c \
+          -j"$(nproc)" \
+          --force-sync \
+          --no-tags \
+          --no-clone-bundle \
+          --optimized-fetch \
+          --current-branch

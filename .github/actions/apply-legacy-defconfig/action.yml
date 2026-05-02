@@ -1,0 +1,83 @@
+name: Apply legacy defconfig
+description: Apply private.fragment to 5.10 gki_defconfig without normalization.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel/common
+
+        DEFCONFIG="arch/arm64/configs/gki_defconfig"
+
+        [ -f "$DEFCONFIG" ] || {
+          echo "::error::missing $DEFCONFIG"
+          exit 1
+        }
+
+        [ -s private.fragment ] || {
+          echo "private.fragment is empty; nothing to apply"
+          exit 0
+        }
+
+        cp "$DEFCONFIG" "$DEFCONFIG.before-private"
+
+        echo "== requested fragment =="
+        cat private.fragment
+        echo
+
+        python3 - <<'PY'
+        from pathlib import Path
+
+        defconfig = Path("arch/arm64/configs/gki_defconfig")
+        fragment = Path("private.fragment")
+
+        requested = []
+        for raw in fragment.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if not line.startswith("CONFIG_") or "=" not in line:
+                continue
+            key = line.split("=", 1)[0]
+            requested.append((key, line))
+
+        req_by_key = dict(requested)
+        seen = set()
+        out = []
+
+        def key_from_notset(line: str):
+            if line.startswith("# CONFIG_") and line.endswith(" is not set"):
+                return line.split()[1]
+            return None
+
+        for line in defconfig.read_text().splitlines():
+            key = None
+
+            if line.startswith("CONFIG_") and "=" in line:
+                key = line.split("=", 1)[0]
+            else:
+                key = key_from_notset(line)
+
+            if key in req_by_key:
+                if key not in seen:
+                    out.append(req_by_key[key])
+                    seen.add(key)
+                continue
+
+            out.append(line)
+
+        missing = [(k, v) for k, v in requested if k not in seen]
+
+        if missing:
+            out.append("")
+            out.append("# Private config fragment. Added by workflow; original unrelated config is preserved.")
+            for key, line in missing:
+                out.append(line)
+
+        defconfig.write_text("\n".join(out) + "\n")
+        PY
+
+        echo "== diff against original gki_defconfig =="
+        diff -u "$DEFCONFIG.before-private" "$DEFCONFIG" || true

@@ -1,0 +1,81 @@
+name: Apply Baseband Guard
+description: Apply vendored Baseband Guard source to kernel/common.
+inputs:
+  baseband_guard:
+    required: true
+    description: Enable Baseband Guard.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ "${{ inputs.baseband_guard }}" != "on" ]; then
+          echo "Baseband Guard off."
+          exit 0
+        fi
+
+        BBG_VENDOR="$GITHUB_WORKSPACE/.github/patches/bbg"
+        COMMON_DIR="$GITHUB_WORKSPACE/kernel/common"
+        UPSTREAM_FILE="$BBG_VENDOR/UPSTREAM"
+        BBG_TARGET="$COMMON_DIR/Baseband-guard"
+
+        echo "== Baseband Guard vendored source =="
+
+        for required in \
+          "$UPSTREAM_FILE" \
+          "$BBG_VENDOR/setup.sh" \
+          "$BBG_VENDOR/Kconfig" \
+          "$BBG_VENDOR/Makefile" \
+          "$BBG_VENDOR/baseband_guard.c" \
+          "$BBG_VENDOR/baseband_guard.h" \
+          "$BBG_VENDOR/kernel_compat.h" \
+          "$BBG_VENDOR/tracing/tracing.c" \
+          "$BBG_VENDOR/tracing/tracing.h"; do
+          if [ ! -f "$required" ]; then
+            echo "::error::missing vendored Baseband Guard file: $required"
+            exit 1
+          fi
+        done
+
+        cat "$UPSTREAM_FILE"
+
+        if [ ! -d "$COMMON_DIR/security" ] || [ ! -f "$COMMON_DIR/security/Kconfig" ]; then
+          echo "::error::kernel/common security/Kconfig not found"
+          exit 1
+        fi
+
+        rm -rf "$BBG_TARGET"
+        mkdir -p "$BBG_TARGET"
+        tar -C "$BBG_VENDOR" --exclude=.git -cf - . | tar -C "$BBG_TARGET" -xf -
+
+        echo "== Run Baseband Guard setup.sh =="
+        cd "$COMMON_DIR"
+        sh "$BBG_TARGET/setup.sh"
+
+        echo "== Patch LSM default =="
+        if ! awk '
+          /^[[:space:]]*config[[:space:]]+LSM$/ { in_lsm=1; next }
+          in_lsm && /^[[:space:]]*config[[:space:]]+/ { exit }
+          in_lsm && /baseband_guard/ { found=1 }
+          END { exit found ? 0 : 1 }
+        ' security/Kconfig; then
+          sed -i '/^[[:space:]]*config[[:space:]]\+LSM$/,/^[[:space:]]*help/{
+            /^[[:space:]]*default[[:space:]]/ {
+              /baseband_guard/! s/selinux/selinux,baseband_guard/
+            }
+          }' security/Kconfig
+        fi
+
+        if ! grep -q 'baseband_guard' security/Kconfig; then
+          echo "::error::baseband_guard missing from kernel/common/security/Kconfig after setup"
+          grep -n 'config LSM\|default\|baseband' security/Kconfig || true
+          exit 1
+        fi
+
+        echo "== Baseband Guard Kconfig lines =="
+        grep -n 'baseband_guard\|baseband-guard' security/Kconfig
+
+        echo "== Baseband Guard diff stat =="
+        git diff --stat -- security Makefile include || true

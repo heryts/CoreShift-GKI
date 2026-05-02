@@ -1,0 +1,62 @@
+name: Package kernel
+description: Package Image into AnyKernel3 zip and export release environment.
+inputs:
+  manager:
+    required: true
+    description: Selected manager.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "== parsed kernel Makefile version =="
+        awk -F' = ' '
+          /^VERSION =/ {print "VERSION=" $2}
+          /^PATCHLEVEL =/ {print "PATCHLEVEL=" $2}
+          /^SUBLEVEL =/ {print "SUBLEVEL=" $2}
+          /^EXTRAVERSION =/ {print "EXTRAVERSION=" $2}
+        ' kernel/common/Makefile
+
+        UPSTREAM="$(
+          awk -F' = ' '
+            /^VERSION =/ {v=$2}
+            /^PATCHLEVEL =/ {p=$2}
+            /^SUBLEVEL =/ {s=$2}
+            /^EXTRAVERSION =/ {e=$2}
+            END {printf "%s.%s.%s%s\n", v, p, s, e}
+          ' kernel/common/Makefile
+        )"
+
+        echo "UPSTREAM_VER=$UPSTREAM" >> "$GITHUB_ENV"
+
+        FINAL_NAME="v${UPSTREAM}-${{ inputs.manager }}-${DATE}"
+        echo "FINAL_NAME=$FINAL_NAME" >> "$GITHUB_ENV"
+
+        mkdir -p ak3_work
+        cp -r .github/patches/anykernel3/* ak3_work/
+
+        IMAGE="$(
+          find kernel/out kernel/common/out \
+            -type f \
+            -name Image \
+            2>/dev/null |
+          head -n 1 || true
+        )"
+
+        if [ -z "$IMAGE" ]; then
+          echo "::error::No Image found under kernel/out or kernel/common/out"
+          find kernel -type f -name Image | sort || true
+          exit 1
+        fi
+
+        echo "Using Image: $IMAGE"
+        cp "$IMAGE" ak3_work/Image
+
+        cd ak3_work
+        zip -r9 "../$FINAL_NAME.zip" *
+        cd ..
+
+        mkdir -p out/
+        cp ak3_work/Image "out/Image-$FINAL_NAME"

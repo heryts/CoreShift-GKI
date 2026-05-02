@@ -1,0 +1,26 @@
+name: Disable legacy KMI check
+description: Disable 5.10 strict KMI symbol-list checks for private builds.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel
+
+        echo "== KMI strict settings before =="
+        grep -RIn 'KMI_SYMBOL_LIST_STRICT_MODE\|TRIM_NONLISTED_KMI' common/build.config* build.config* 2>/dev/null || true
+
+        find common . \
+          -maxdepth 2 \
+          -type f \
+          -name 'build.config*' \
+          -print0 |
+        xargs -0 sed -i \
+          -e 's/^KMI_SYMBOL_LIST_STRICT_MODE=.*/KMI_SYMBOL_LIST_STRICT_MODE=/' \
+          -e 's/^TRIM_NONLISTED_KMI=.*/TRIM_NONLISTED_KMI=/'
+
+        echo
+        echo "== KMI strict settings after =="
+        grep -RIn 'KMI_SYMBOL_LIST_STRICT_MODE\|TRIM_NONLISTED_KMI' common/build.config* build.config* 2>/dev/null || true

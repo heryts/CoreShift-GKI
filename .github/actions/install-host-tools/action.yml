@@ -1,0 +1,40 @@
+name: Install host tools
+description: Install Ubuntu packages required by the selected kernel build.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version to build.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        sudo apt-get update
+
+        if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+          sudo apt-get install -y \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            python3 \
+            python-is-python3 \
+            zip \
+            unzip \
+            curl \
+            git
+        else
+          sudo apt-get install -y \
+            python3 \
+            python-is-python3 \
+            zip \
+            unzip \
+            curl \
+            git
+        fi
+
+        sudo apt-get clean
+        sudo rm -rf /var/lib/apt/lists/*

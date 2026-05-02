@@ -1,0 +1,180 @@
+name: Apply SUSFS4KSU
+description: Apply SUSFS4KSU source files and patches for selected GKI version.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version to patch.
+  manager:
+    required: true
+    description: Selected manager.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ "${{ inputs.manager }}" = "Vanilla" ]; then
+          echo "::error::SUSFS4KSU requires a KernelSU-compatible manager."
+          exit 1
+        fi
+
+        case "${{ inputs.kernel_version }}" in
+          5.10)
+            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
+            ;;
+          6.1)
+            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android14-6.1"
+            ;;
+          6.6)
+            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
+            ;;
+          *)
+            echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
+            exit 1
+            ;;
+        esac
+
+        echo "== SUSFS4KSU patch dir =="
+        echo "$PATCH_DIR"
+
+        SUSFS_C="$PATCH_DIR/fs/susfs.c"
+        SUSFS_INCLUDE_DIR="$PATCH_DIR/include/linux"
+        KSU_PATCH="$PATCH_DIR/KernelSU/10_enable_susfs_for_ksu.patch"
+
+        case "${{ inputs.kernel_version }}" in
+          5.10)
+            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android12-5.10.patch"
+            ;;
+          6.1)
+            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android14-6.1.patch"
+            ;;
+          6.6)
+            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android15-6.6.patch"
+            ;;
+        esac
+
+        for path in "$PATCH_DIR" "$SUSFS_C" "$SUSFS_INCLUDE_DIR" "$SUSFS_PATCH" "$KSU_PATCH"; do
+          if [ ! -e "$path" ]; then
+            echo "::error::missing SUSFS file/patch: $path"
+            exit 1
+          fi
+        done
+
+        if ! find "$SUSFS_INCLUDE_DIR" -maxdepth 1 -type f -name '*.h' | grep -q .; then
+          echo "::error::missing SUSFS include/linux/*.h files in $SUSFS_INCLUDE_DIR"
+          exit 1
+        fi
+
+        cd kernel/common
+
+        echo "== copy SUSFS files =="
+        mkdir -p fs include/linux
+        cp "$SUSFS_C" fs/susfs.c
+        cp "$SUSFS_INCLUDE_DIR"/* include/linux/
+        ls -l fs/susfs.c include/linux/susfs*.h
+
+        show_context() {
+          pattern="$1"
+          file="$2"
+
+          if ! grep -n -C2 -E "$pattern" "$file"; then
+            echo "not present: $pattern"
+          fi
+        }
+
+        if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+          echo
+          echo "== 6.1 namespace blk hook include before workaround =="
+          show_context '^#include <trace/hooks/blk\.h>$' fs/namespace.c
+
+          sed -i '/^#include <trace\/hooks\/blk\.h>$/d' fs/namespace.c
+
+          echo "== 6.1 namespace blk hook include after removal =="
+          show_context '^#include <trace/hooks/blk\.h>$' fs/namespace.c
+        fi
+
+        echo
+        echo "== check/apply core SUSFS patch =="
+        if ! git apply --check "$SUSFS_PATCH"; then
+          echo "::error::core SUSFS patch does not apply"
+          exit 1
+        fi
+
+        git apply "$SUSFS_PATCH"
+
+        if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+          echo
+          echo "== 6.1 namespace blk hook include before restore =="
+          show_context '^#include <trace/hooks/blk\.h>$' fs/namespace.c
+
+          if ! grep -qF '#include <trace/hooks/blk.h>' fs/namespace.c; then
+            sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+          fi
+
+          echo "== 6.1 namespace blk hook include after restore =="
+          grep -nF '#include <trace/hooks/blk.h>' fs/namespace.c
+        fi
+
+        if find . -name '*.rej' -print -quit | grep -q .; then
+          echo "::error::reject files found after SUSFS patch"
+          find . -name '*.rej' -print
+          exit 1
+        fi
+
+        if grep -RInE '^(<<<<<<< .+|=======$|>>>>>>> .+)$' \
+          fs \
+          include/linux/susfs.h \
+          include/linux/susfs_def.h \
+          drivers/input/input.c \
+          kernel \
+          security/selinux; then
+          echo "::error::conflict markers found after core SUSFS patch"
+          exit 1
+        fi
+
+        echo
+        echo "== locate integrated KernelSU root =="
+        KSU_MARKERS="$(
+          find "$GITHUB_WORKSPACE/kernel/common" \
+            -type f \
+            -path "*/kernel/include/ksu.h" \
+            -print
+        )"
+
+        if [ -z "$KSU_MARKERS" ]; then
+          echo "::error::No integrated KernelSU root found for manager '${{ inputs.manager }}'. Expected a file matching */kernel/include/ksu.h under $GITHUB_WORKSPACE/kernel/common."
+          echo "== nearby KernelSU/KSU directories =="
+          find "$GITHUB_WORKSPACE/kernel/common" \
+            -type d \
+            \( -iname '*kernelsu*' -o -iname '*ksu*' \) \
+            -print 2>/dev/null |
+            sort |
+            head -100
+          exit 1
+        fi
+
+        KSU_MARKER="$(printf '%s\n' "$KSU_MARKERS" | sort | head -n 1)"
+        KSU_ROOT="${KSU_MARKER%/kernel/include/ksu.h}"
+
+        echo "KSU_ROOT=$KSU_ROOT"
+
+        cd "$KSU_ROOT"
+
+        echo
+        echo "== check/apply KernelSU SUSFS patch from KSU_ROOT =="
+        git apply --check "$KSU_PATCH"
+        git apply "$KSU_PATCH"
+
+        if grep -RInE '^(<<<<<<< .+|=======$|>>>>>>> .+)$' kernel; then
+          echo "::error::conflict markers found after KernelSU SUSFS patch"
+          exit 1
+        fi
+
+        echo
+        echo "== SUSFS kernel/common git diff stat =="
+        git -C "$GITHUB_WORKSPACE/kernel/common" diff --stat
+
+        echo
+        echo "== SUSFS KernelSU git diff stat =="
+        git -C "$KSU_ROOT" diff --stat

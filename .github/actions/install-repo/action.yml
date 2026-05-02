@@ -1,0 +1,13 @@
+name: Install repo
+description: Install Android repo tool.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        mkdir -p "$HOME/bin"
+        curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
+        chmod a+x "$HOME/bin/repo"
+        echo "$HOME/bin" >> "$GITHUB_PATH"

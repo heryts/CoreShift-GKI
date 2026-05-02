@@ -1,0 +1,83 @@
+name: Disable legacy defconfig check
+description: Disable 5.10 check_defconfig separately from defconfig edits.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel
+
+        echo "== locating defconfig check references =="
+        grep -RIn 'check_defconfig\|savedefconfig does not match' build common 2>/dev/null || true
+
+        echo
+        echo "== patch check_defconfig functions to no-op =="
+
+        python3 - <<'PY'
+        from pathlib import Path
+        import re
+
+        roots = [Path("build"), Path("common")]
+        patched = []
+
+        patterns = [
+            re.compile(r'check_defconfig\(\)\s*\{.*?^\}', re.M | re.S),
+            re.compile(r'function\s+check_defconfig\s*\{.*?^\}', re.M | re.S),
+        ]
+
+        replacement = '''check_defconfig() {
+            echo "[SKIP] check_defconfig disabled for private non-normalized GKI defconfig"
+            return 0
+        }'''
+
+        for root in roots:
+            if not root.exists():
+                continue
+
+            for path in root.rglob("*"):
+                if not path.is_file():
+                    continue
+
+                try:
+                    text = path.read_text()
+                except UnicodeDecodeError:
+                    continue
+
+                old = text
+
+                if "check_defconfig" not in text and "savedefconfig does not match" not in text:
+                    continue
+
+                for pat in patterns:
+                    text = pat.sub(replacement, text)
+
+                if text != old:
+                    path.write_text(text)
+                    patched.append(str(path))
+
+        if patched:
+            print("patched files:")
+            for p in patched:
+                print("  " + p)
+        else:
+            print("no check_defconfig function patched")
+        PY
+
+        echo
+        echo "== patch command-chain references =="
+
+        find common build . \
+          -maxdepth 3 \
+          -type f \
+          \( -name 'build.config*' -o -name '*.sh' \) \
+          -print0 |
+        xargs -0 sed -i \
+          -e 's/check_defconfig && //g' \
+          -e 's/ && check_defconfig//g' \
+          -e 's/^check_defconfig$/true # check_defconfig disabled/g'
+
+        echo
+        echo "== remaining defconfig check references =="
+        grep -RIn 'check_defconfig\|savedefconfig does not match' build common 2>/dev/null || true

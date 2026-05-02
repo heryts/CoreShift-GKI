@@ -1,0 +1,87 @@
+name: Commit kernel changes
+description: Commit workflow changes in kernel/common and nested manager repositories, then guard clean trees before build.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        COMMON_DIR="$GITHUB_WORKSPACE/kernel/common"
+        NESTED_NAMES="
+        KernelSU
+        KowSU
+        KernelSU-Next
+        ResukiSU
+        Rissu
+        Wild_KSU
+        "
+
+        git config --global user.email "bot@github.com"
+        git config --global user.name "Workflow Bot"
+
+        show_status() {
+          label="$1"
+          dir="$2"
+
+          if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "== $label status: $dir =="
+            git -C "$dir" status --short
+          fi
+        }
+
+        commit_repo() {
+          dir="$1"
+          msg="$2"
+
+          if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C "$dir" add -A
+            git -C "$dir" commit -m "$msg" || true
+          fi
+        }
+
+        guard_clean() {
+          label="$1"
+          dir="$2"
+
+          if ! git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            return 0
+          fi
+
+          if [ -n "$(git -C "$dir" status --short)" ]; then
+            echo "::error::$label repository is dirty after commit step: $dir"
+            git -C "$dir" status --short
+            git -C "$dir" diff --stat || true
+            git -C "$dir" diff --cached --stat || true
+            return 1
+          fi
+        }
+
+        echo "== status before commits =="
+        show_status "kernel/common" "$COMMON_DIR"
+        for name in $NESTED_NAMES; do
+          show_status "$name" "$COMMON_DIR/$name"
+        done
+
+        for name in $NESTED_NAMES; do
+          commit_repo "$COMMON_DIR/$name" "Apply workflow manager patches"
+        done
+
+        commit_repo "$COMMON_DIR" "Apply workflow kernel changes"
+
+        echo
+        echo "== status after commits =="
+        show_status "kernel/common" "$COMMON_DIR"
+        for name in $NESTED_NAMES; do
+          show_status "$name" "$COMMON_DIR/$name"
+        done
+
+        FAIL=0
+        guard_clean "kernel/common" "$COMMON_DIR" || FAIL=1
+        for name in $NESTED_NAMES; do
+          guard_clean "$name" "$COMMON_DIR/$name" || FAIL=1
+        done
+
+        if [ "$FAIL" -ne 0 ]; then
+          exit 1
+        fi
