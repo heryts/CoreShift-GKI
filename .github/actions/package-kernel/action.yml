@@ -1,9 +1,15 @@
 name: Package kernel
 description: Package Image into AnyKernel3 zip and export release environment.
 inputs:
+  kernel_version:
+    required: true
+    description: Selected kernel version.
   manager:
     required: true
     description: Selected manager.
+  susfs:
+    required: true
+    description: SUSFS status.
 runs:
   using: composite
   steps:
@@ -31,7 +37,7 @@ runs:
 
         echo "UPSTREAM_VER=$UPSTREAM" >> "$GITHUB_ENV"
 
-        FINAL_NAME="v${UPSTREAM}-${{ inputs.manager }}-${DATE}"
+        FINAL_NAME="v${UPSTREAM}-gki-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${DATE}"
         echo "FINAL_NAME=$FINAL_NAME" >> "$GITHUB_ENV"
 
         mkdir -p ak3_work
