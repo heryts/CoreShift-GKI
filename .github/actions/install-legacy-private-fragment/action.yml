@@ -1,0 +1,163 @@
+name: Install legacy private fragment hook
+description: Apply 5.10 private.fragment after defconfig generation without modifying gki_defconfig.
+inputs:
+  strict_config:
+    required: true
+    description: Fail when requested configs do not land.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel
+
+        COMMON_DIR="$PWD/common"
+        SCRIPT="$COMMON_DIR/scripts/apply_private_fragment.sh"
+
+        mkdir -p "$COMMON_DIR/scripts"
+
+        cat > "$SCRIPT" <<'EOF'
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        FRAGMENT="$COMMON_DIR/private.fragment"
+        REQUIRED="$COMMON_DIR/private.required"
+        STRICT_CONFIG="${STRICT_CONFIG:-off}"
+
+        find_out_dir() {
+          if [ -n "${OUT_DIR:-}" ] && [ -f "$OUT_DIR/.config" ]; then
+            printf '%s\n' "$OUT_DIR"
+            return 0
+          fi
+
+          for candidate in \
+            "$COMMON_DIR/out" \
+            "$COMMON_DIR/../out" \
+            "$COMMON_DIR/../out/${BRANCH:-}" \
+            "$COMMON_DIR/out/${BRANCH:-}"
+          do
+            [ -n "$candidate" ] || continue
+            if [ -f "$candidate/.config" ]; then
+              printf '%s\n' "$candidate"
+              return 0
+            fi
+          done
+
+          return 1
+        }
+
+        if [ ! -s "$FRAGMENT" ]; then
+          echo "private.fragment is empty; nothing to apply"
+          exit 0
+        fi
+
+        OUT_DIR="$(find_out_dir)" || {
+          echo "::error::Unable to locate OUT_DIR/.config for private.fragment merge"
+          echo "OUT_DIR=${OUT_DIR:-}"
+          exit 1
+        }
+        OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+
+        echo "== private.fragment =="
+        cat "$FRAGMENT"
+        echo
+
+        "$COMMON_DIR/scripts/kconfig/merge_config.sh" \
+          -m \
+          -r \
+          -O "$OUT_DIR" \
+          "$OUT_DIR/.config" \
+          "$FRAGMENT"
+
+        (
+          cd "$COMMON_DIR"
+          make O="$OUT_DIR" ARCH=arm64 olddefconfig
+        )
+
+        if [ ! -s "$REQUIRED" ]; then
+          echo "private.required is empty; no required config states to print"
+          exit 0
+        fi
+
+        echo
+        echo "== final private.required states =="
+
+        FAIL=0
+        while IFS= read -r line; do
+          [ -n "$line" ] || continue
+          key="${line%%=*}"
+          state="$(grep -E "^${key}=|^# ${key} is not set" "$OUT_DIR/.config" || true)"
+
+          if [ -n "$state" ]; then
+            echo "$state"
+          else
+            echo "::warning::$key missing from final .config"
+          fi
+
+          if ! grep -qxF "$line" "$OUT_DIR/.config"; then
+            echo "::warning::$line did not land in final .config"
+            FAIL=1
+          fi
+        done < "$REQUIRED"
+
+        if [ "$FAIL" -ne 0 ] && [ "$STRICT_CONFIG" = "on" ]; then
+          echo "::error::strict_config is on, failing because requested config did not land."
+          exit 1
+        fi
+        EOF
+
+        sed -i 's/^        //' "$SCRIPT"
+        chmod +x "$SCRIPT"
+
+        if grep -q 'POST_DEFCONFIG_CMDS' build/build.sh; then
+          {
+            printf '\n'
+            printf '# Apply workflow private config after base defconfig; keep gki_defconfig untouched.\n'
+            printf 'STRICT_CONFIG="${STRICT_CONFIG:-${{ inputs.strict_config }}}"\n'
+            printf 'POST_DEFCONFIG_CMDS="${POST_DEFCONFIG_CMDS:-} ${ROOT_DIR}/${KERNEL_DIR}/scripts/apply_private_fragment.sh"\n'
+          } >> "$COMMON_DIR/build.config.gki.aarch64"
+        else
+          python3 - <<'PY'
+        from pathlib import Path
+
+        path = Path("build/build.sh")
+        text = path.read_text()
+        marker = 'scripts/apply_private_fragment.sh'
+
+        if marker in text:
+            raise SystemExit(0)
+
+        lines = text.splitlines()
+        out = []
+        inserted = False
+
+        for line in lines:
+            out.append(line)
+            stripped = line.strip()
+            if (
+                not inserted
+                and "make" in stripped
+                and "O=" in stripped
+                and "DEFCONFIG" in stripped
+            ):
+                indent = line[: len(line) - len(line.lstrip())]
+                strict_config = "${{ inputs.strict_config }}"
+                out.extend([
+                    f'{indent}if [ -x "${{ROOT_DIR}}/${{KERNEL_DIR}}/scripts/apply_private_fragment.sh" ]; then',
+                    indent + '  STRICT_CONFIG="${STRICT_CONFIG:-' + strict_config + '}" "${ROOT_DIR}/${KERNEL_DIR}/scripts/apply_private_fragment.sh"',
+                    f'{indent}fi',
+                ])
+                inserted = True
+
+        if not inserted:
+            raise SystemExit("Unable to patch build/build.sh after defconfig generation")
+
+        path.write_text("\n".join(out) + "\n")
+        PY
+        fi
+
+        echo "== legacy private fragment hook =="
+        grep -n 'POST_DEFCONFIG_CMDS\|apply_private_fragment' "$COMMON_DIR/build.config.gki.aarch64" build/build.sh || true

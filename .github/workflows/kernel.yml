@@ -190,9 +190,11 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Apply fragment to legacy defconfig
+      - name: Install legacy private fragment hook
         if: ${{ inputs.kernel_version == '5.10' }}
-        uses: ./.github/actions/apply-legacy-defconfig
+        uses: ./.github/actions/install-legacy-private-fragment
+        with:
+          strict_config: ${{ inputs.strict_config }}
 
       - name: Disable legacy 5.10 defconfig normalization check
         if: ${{ inputs.kernel_version == '5.10' }}
@@ -205,6 +207,19 @@ jobs:
       - name: Add swap for full LTO
         if: ${{ inputs.lto == 'full' }}
         uses: ./.github/actions/add-swap
+
+      - name: Guard legacy gki_defconfig
+        if: ${{ inputs.kernel_version == '5.10' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd kernel
+
+          if ! git -C common diff --exit-code -- arch/arm64/configs/gki_defconfig; then
+            echo "::error::common/arch/arm64/configs/gki_defconfig changed; private.fragment must apply only to generated .config"
+            exit 1
+          fi
 
       - name: Commit kernel changes
         uses: ./.github/actions/commit-kernel-changes
