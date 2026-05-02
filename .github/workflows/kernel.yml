@@ -4,151 +4,169 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: ${{ matrix.kernel_version }} / ${{ matrix.manager }}
+  prepare-matrix:
+    name: Prepare matrix
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        kernel_version: ["5.10", "6.1", "6.6"]
-        manager: ["Vanilla", "KernelSU", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
-
-    permissions:
-      contents: read
-
-    env:
-      LTO: thin
-      IKCONFIG: "on"
-      CONTAINER_CORE: "on"
-      CONTAINER_IPC: "off"
-      MOUNT_FILESYSTEMS: "on"
-      CONTAINER_NETWORKING: "off"
-      FQ_CODEL_FEATURES: "off"
-      PERFORMANCE_FEATURES: "off"
-      DEBUG_FEATURES: "off"
-      HEAVY_DEBUG_FEATURES: "off"
-      BASEBAND_GUARD: "off"
-      STRICT_CONFIG: "off"
-      LEGACY_KMI_CHECK: "on"
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
-      - name: Select variant
-        id: variant
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build variant matrix
+        id: matrix
         shell: bash
         run: |
           set -euo pipefail
 
-          kernel_version="${{ matrix.kernel_version }}"
-          manager="${{ matrix.manager }}"
-          susfs="off"
-          build_variant="false"
+          matrix="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-          if [ "$manager" = "Vanilla" ]; then
-            build_variant="true"
-          else
-            case "$manager:$kernel_version" in
-              KernelSU:5.10|KernelSU:6.1|KernelSU:6.6|KowSU:5.10|KowSU:6.1|KowSU:6.6)
-                susfs="on"
-                build_variant="true"
-                ;;
-            esac
-          fi
+          required = {
+              "kernel_version",
+              "manager",
+              "susfs",
+              "lto",
+              "ikconfig",
+              "container_core",
+              "container_ipc",
+              "mount_filesystems",
+              "container_networking",
+              "fq_codel_features",
+              "performance_features",
+              "debug_features",
+              "heavy_debug_features",
+              "baseband_guard",
+              "strict_config",
+              "legacy_kmi_check",
+          }
 
-          if [ "$build_variant" != "true" ]; then
-            echo "Skipping unsupported SUSFS variant: manager=$manager kernel_version=$kernel_version"
-          fi
+          matrix = json.loads(Path(".github/matrix/release.json").read_text())
+          include = matrix.get("include")
+
+          if not isinstance(include, list) or not include:
+              raise SystemExit("release matrix must contain a non-empty include list")
+
+          for index, variant in enumerate(include):
+              if not isinstance(variant, dict):
+                  raise SystemExit(f"variant {index} must be an object")
+
+              missing = sorted(required - set(variant))
+              extra = sorted(set(variant) - required)
+
+              if missing:
+                  raise SystemExit(f"variant {index} missing fields: {', '.join(missing)}")
+              if extra:
+                  raise SystemExit(f"variant {index} has unknown fields: {', '.join(extra)}")
+
+          print(json.dumps(matrix, separators=(",", ":"), sort_keys=True))
+          PY
+          )"
+
+          echo "== matrix JSON =="
+          printf '%s\n' "$matrix"
 
           {
-            echo "build_variant=$build_variant"
-            echo "susfs=$susfs"
+            echo "matrix<<EOF"
+            printf '%s\n' "$matrix"
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+  build:
+    name: ${{ matrix.kernel_version }} / ${{ matrix.manager }} / SUSFS ${{ matrix.susfs }}
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    permissions:
+      contents: read
+
+    steps:
       - name: Checkout
-        if: steps.variant.outputs.build_variant == 'true'
         uses: actions/checkout@v4
         with:
           submodules: false
           fetch-depth: 1
 
       - name: Set variables
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/setup-vars
         with:
           kernel_version: ${{ matrix.kernel_version }}
 
       - name: Install host tools
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/install-host-tools
         with:
           kernel_version: ${{ matrix.kernel_version }}
 
       - name: Install repo
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/install-repo
 
       - name: Sync source
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/sync-kernel
 
       - name: Init manager
-        if: steps.variant.outputs.build_variant == 'true' && matrix.manager != 'Vanilla'
+        if: matrix.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
         with:
           manager: ${{ matrix.manager }}
           manager_ref: ""
-          susfs: ${{ steps.variant.outputs.susfs }}
+          susfs: ${{ matrix.susfs }}
           kernel_version: ${{ matrix.kernel_version }}
 
       - name: Apply SUSFS4KSU patches
-        if: steps.variant.outputs.build_variant == 'true' && steps.variant.outputs.susfs == 'on'
+        if: matrix.susfs == 'on'
         uses: ./.github/actions/apply-susfs
         with:
           kernel_version: ${{ matrix.kernel_version }}
           manager: ${{ matrix.manager }}
 
       - name: Create private config fragment
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/create-config-fragment
         with:
-          ikconfig: ${{ env.IKCONFIG }}
-          container_core: ${{ env.CONTAINER_CORE }}
-          container_ipc: ${{ env.CONTAINER_IPC }}
-          mount_filesystems: ${{ env.MOUNT_FILESYSTEMS }}
-          container_networking: ${{ env.CONTAINER_NETWORKING }}
-          fq_codel_features: ${{ env.FQ_CODEL_FEATURES }}
-          performance_features: ${{ env.PERFORMANCE_FEATURES }}
-          debug_features: ${{ env.DEBUG_FEATURES }}
-          heavy_debug_features: ${{ env.HEAVY_DEBUG_FEATURES }}
-          susfs: ${{ steps.variant.outputs.susfs }}
-          baseband_guard: ${{ env.BASEBAND_GUARD }}
+          ikconfig: ${{ matrix.ikconfig }}
+          container_core: ${{ matrix.container_core }}
+          container_ipc: ${{ matrix.container_ipc }}
+          mount_filesystems: ${{ matrix.mount_filesystems }}
+          container_networking: ${{ matrix.container_networking }}
+          fq_codel_features: ${{ matrix.fq_codel_features }}
+          performance_features: ${{ matrix.performance_features }}
+          debug_features: ${{ matrix.debug_features }}
+          heavy_debug_features: ${{ matrix.heavy_debug_features }}
+          susfs: ${{ matrix.susfs }}
+          baseband_guard: ${{ matrix.baseband_guard }}
           kernel_version: ${{ matrix.kernel_version }}
 
       - name: Apply IPC KABI patches
-        if: steps.variant.outputs.build_variant == 'true' && env.CONTAINER_IPC == 'on'
+        if: matrix.container_ipc == 'on'
         uses: ./.github/actions/apply-ipc-kabi-patches
         with:
           kernel_version: ${{ matrix.kernel_version }}
 
       - name: Install legacy private fragment hook
-        if: steps.variant.outputs.build_variant == 'true' && matrix.kernel_version == '5.10'
+        if: matrix.kernel_version == '5.10'
         uses: ./.github/actions/install-legacy-private-fragment
         with:
-          strict_config: ${{ env.STRICT_CONFIG }}
+          strict_config: ${{ matrix.strict_config }}
 
       - name: Disable legacy 5.10 defconfig normalization check
-        if: steps.variant.outputs.build_variant == 'true' && matrix.kernel_version == '5.10'
+        if: matrix.kernel_version == '5.10'
         uses: ./.github/actions/disable-legacy-defconfig-check
 
       - name: Disable legacy 5.10 strict KMI check for private build
-        if: steps.variant.outputs.build_variant == 'true' && matrix.kernel_version == '5.10' && env.LEGACY_KMI_CHECK == 'off'
+        if: matrix.kernel_version == '5.10' && matrix.legacy_kmi_check == 'off'
         uses: ./.github/actions/disable-legacy-kmi-check
 
       - name: Add swap for full LTO
-        if: steps.variant.outputs.build_variant == 'true' && env.LTO == 'full'
+        if: matrix.lto == 'full'
         uses: ./.github/actions/add-swap
 
       - name: Guard legacy gki_defconfig
-        if: steps.variant.outputs.build_variant == 'true' && matrix.kernel_version == '5.10'
+        if: matrix.kernel_version == '5.10'
         shell: bash
         run: |
           set -euo pipefail
@@ -161,31 +179,26 @@ jobs:
           fi
 
       - name: Commit kernel changes
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/commit-kernel-changes
 
       - name: Build kernel
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/build-kernel
         with:
-          lto: ${{ env.LTO }}
+          lto: ${{ matrix.lto }}
 
       - name: Verify final config
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/verify-final-config
         with:
-          strict_config: ${{ env.STRICT_CONFIG }}
+          strict_config: ${{ matrix.strict_config }}
 
       - name: Package
-        if: steps.variant.outputs.build_variant == 'true'
         uses: ./.github/actions/package-kernel
         with:
           kernel_version: ${{ matrix.kernel_version }}
           manager: ${{ matrix.manager }}
-          susfs: ${{ steps.variant.outputs.susfs }}
+          susfs: ${{ matrix.susfs }}
 
       - name: Write release manifest
-        if: steps.variant.outputs.build_variant == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -193,15 +206,27 @@ jobs:
           {
             echo "kernel_version=${{ matrix.kernel_version }}"
             echo "manager=${{ matrix.manager }}"
-            echo "susfs=${{ steps.variant.outputs.susfs }}"
+            echo "susfs=${{ matrix.susfs }}"
+            echo "lto=${{ matrix.lto }}"
+            echo "ikconfig=${{ matrix.ikconfig }}"
+            echo "container_core=${{ matrix.container_core }}"
+            echo "container_ipc=${{ matrix.container_ipc }}"
+            echo "mount_filesystems=${{ matrix.mount_filesystems }}"
+            echo "container_networking=${{ matrix.container_networking }}"
+            echo "fq_codel_features=${{ matrix.fq_codel_features }}"
+            echo "performance_features=${{ matrix.performance_features }}"
+            echo "debug_features=${{ matrix.debug_features }}"
+            echo "heavy_debug_features=${{ matrix.heavy_debug_features }}"
+            echo "baseband_guard=${{ matrix.baseband_guard }}"
+            echo "strict_config=${{ matrix.strict_config }}"
+            echo "legacy_kmi_check=${{ matrix.legacy_kmi_check }}"
             echo "name=${FINAL_NAME}"
           } > release-manifest.txt
 
       - name: Upload build artifact
-        if: steps.variant.outputs.build_variant == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ matrix.kernel_version }}-${{ matrix.manager }}-susfs-${{ steps.variant.outputs.susfs }}-${{ env.DATE }}
+          name: kernel-${{ matrix.kernel_version }}-${{ matrix.manager }}-susfs-${{ matrix.susfs }}-${{ env.DATE }}
           path: |
             *.zip
             out/Image-*
@@ -247,17 +272,58 @@ jobs:
           {
             echo "Coreshift GKI release matrix"
             echo
-            echo "- LTO: thin"
-            echo "- IKCONFIG: on"
-            echo "- Container core: on"
-            echo "- Container IPC: off"
-            echo "- Mount filesystems: on"
-            echo "- Container networking: off"
-            echo "- FQ/FQ_CODEL features: off"
-            echo "- Performance features: off"
-            echo "- Baseband Guard: off"
-            echo "- Strict config verification: off"
-            echo "- Legacy KMI check: on"
+            declare -A labels=(
+              [lto]="LTO"
+              [ikconfig]="IKCONFIG"
+              [container_core]="Container core"
+              [container_ipc]="Container IPC"
+              [mount_filesystems]="Mount filesystems"
+              [container_networking]="Container networking"
+              [fq_codel_features]="FQ/FQ_CODEL features"
+              [performance_features]="Performance features"
+              [debug_features]="Debug features"
+              [heavy_debug_features]="Heavy debug features"
+              [baseband_guard]="Baseband Guard"
+              [strict_config]="Strict config verification"
+              [legacy_kmi_check]="Legacy KMI check"
+            )
+
+            for key in \
+              lto \
+              ikconfig \
+              container_core \
+              container_ipc \
+              mount_filesystems \
+              container_networking \
+              fq_codel_features \
+              performance_features \
+              debug_features \
+              heavy_debug_features \
+              baseband_guard \
+              strict_config \
+              legacy_kmi_check
+            do
+              values="$(
+                while IFS= read -r manifest; do
+                  sed -n "s/^${key}=//p" "$manifest"
+                done < <(find release-artifacts -type f -name release-manifest.txt | sort) |
+                sort -u
+              )"
+
+              if [ "$(printf '%s\n' "$values" | sed '/^$/d' | wc -l)" -eq 1 ]; then
+                echo "- ${labels[$key]}: $values"
+              else
+                echo "- ${labels[$key]}: varies"
+                while IFS= read -r manifest; do
+                  kernel_version="$(sed -n 's/^kernel_version=//p' "$manifest")"
+                  manager="$(sed -n 's/^manager=//p' "$manifest")"
+                  susfs="$(sed -n 's/^susfs=//p' "$manifest")"
+                  value="$(sed -n "s/^${key}=//p" "$manifest")"
+                  printf '  - %s / %s / SUSFS %s: %s\n' "$kernel_version" "$manager" "$susfs" "$value"
+                done < <(find release-artifacts -type f -name release-manifest.txt | sort)
+              fi
+            done
+
             echo "- Date: $date"
             echo
 
