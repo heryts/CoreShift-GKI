@@ -11,11 +11,11 @@ runs:
       run: |
         set -euo pipefail
 
-        cd kernel
-
-        COMMON_DIR="$PWD/common"
+        ROOT_DIR="$GITHUB_WORKSPACE"
+        COMMON_DIR="$ROOT_DIR/kernel/common"
         SCRIPT="$COMMON_DIR/scripts/apply_private_fragment.sh"
 
+        cd "$ROOT_DIR/kernel"
         mkdir -p "$COMMON_DIR/scripts"
 
         cat > "$SCRIPT" <<'EOF'
@@ -117,7 +117,7 @@ runs:
             printf '\n'
             printf '# Apply workflow private config after base defconfig; keep gki_defconfig untouched.\n'
             printf 'STRICT_CONFIG="${STRICT_CONFIG:-${{ inputs.strict_config }}}"\n'
-            printf 'POST_DEFCONFIG_CMDS="${POST_DEFCONFIG_CMDS:-} ${ROOT_DIR}/${KERNEL_DIR}/scripts/apply_private_fragment.sh"\n'
+            printf 'POST_DEFCONFIG_CMDS="${POST_DEFCONFIG_CMDS:-} ${GITHUB_WORKSPACE}/kernel/common/scripts/apply_private_fragment.sh"\n'
           } >> "$COMMON_DIR/build.config.gki.aarch64"
         else
           python3 - <<'PY'
@@ -145,9 +145,10 @@ runs:
             ):
                 indent = line[: len(line) - len(line.lstrip())]
                 strict_config = "${{ inputs.strict_config }}"
+                script = '"${GITHUB_WORKSPACE}/kernel/common/scripts/apply_private_fragment.sh"'
                 out.extend([
-                    f'{indent}if [ -x "${{ROOT_DIR}}/${{KERNEL_DIR}}/scripts/apply_private_fragment.sh" ]; then',
-                    indent + '  STRICT_CONFIG="${STRICT_CONFIG:-' + strict_config + '}" "${ROOT_DIR}/${KERNEL_DIR}/scripts/apply_private_fragment.sh"',
+                    f'{indent}if [ -x {script} ]; then',
+                    indent + '  STRICT_CONFIG="${STRICT_CONFIG:-' + strict_config + '}" ' + script,
                     f'{indent}fi',
                 ])
                 inserted = True
