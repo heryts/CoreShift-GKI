@@ -10,6 +10,10 @@ inputs:
   susfs:
     required: true
     description: SUSFS status.
+  final_name:
+    required: false
+    default: ""
+    description: Optional exact output basename.
 runs:
   using: composite
   steps:
@@ -37,7 +41,11 @@ runs:
 
         echo "UPSTREAM_VER=$UPSTREAM" >> "$GITHUB_ENV"
 
-        FINAL_NAME="v${UPSTREAM}-gki-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${DATE}"
+        if [ -n "${{ inputs.final_name }}" ]; then
+          FINAL_NAME="${{ inputs.final_name }}"
+        else
+          FINAL_NAME="v${UPSTREAM}-gki-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${DATE}"
+        fi
         echo "FINAL_NAME=$FINAL_NAME" >> "$GITHUB_ENV"
 
         mkdir -p ak3_work

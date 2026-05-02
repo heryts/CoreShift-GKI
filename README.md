@@ -55,7 +55,8 @@ Your selected GKI version must match your device and ROM family.
 
 1. Fork this repo.
 2. Open the **Actions** tab in your fork.
-3. Run **Build Kernel (GKI LTS)**.
+3. Run **Custom Kernel Build** for one build, or **Build Kernel Release Matrix**
+   for the curated release set.
 4. Pick your kernel version and options.
 5. Wait for the release to finish.
 6. Download the flashable AnyKernel zip.
@@ -119,7 +120,19 @@ first, then test these features separately.
 
 ## Outputs
 
-Each successful run publishes a release with:
+Custom builds support three publish modes:
+
+- `release` creates a GitHub release containing the exact flashable AnyKernel
+  zip and raw `Image`.
+- `artifact` uploads a staged AnyKernel directory. GitHub downloads artifacts as
+  zip files, so use the downloaded artifact zip directly as the flashable
+  package.
+- `both` creates the release and uploads the staged artifacts.
+
+Uploading an existing flashable zip as a GitHub artifact creates a zip inside a
+zip. Artifact mode avoids that by staging the flashable tree instead.
+
+Release-mode and matrix runs publish:
 
 - A flashable AnyKernel zip
 - A raw kernel `Image`
