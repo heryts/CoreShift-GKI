@@ -53,6 +53,8 @@ runs:
           export SKIP_CP_KERNEL_HDRS=1
           export SKIP_UNSTRIPPED_MODULES=1
           export SKIP_DEBUG_INFO=1
+          export SKIP_EXT_MODULES=1
+          export SKIP_HEADERS_INSTALL=1
 
           selected_defconfig="$(
             sed -n 's/^[[:space:]]*export[[:space:]]\+DEFCONFIG=//p; s/^[[:space:]]*DEFCONFIG=//p' "$BUILD_CONFIG" |
