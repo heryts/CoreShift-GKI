@@ -192,6 +192,13 @@ jobs:
         with:
           strict_config: ${{ matrix.strict_config }}
 
+      - name: Export final config
+        uses: ./.github/actions/export-final-config
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+          susfs: ${{ matrix.susfs }}
+
       - name: Package
         uses: ./.github/actions/package-kernel
         with:
@@ -231,6 +238,7 @@ jobs:
           path: |
             *.zip
             out/Image-*
+            out/config-*
             release-manifest.txt
           if-no-files-found: error
 
@@ -260,7 +268,7 @@ jobs:
 
           mkdir -p "$release_dir"
 
-          find release-artifacts -type f \( -name '*.zip' -o -name 'Image-*' \) -print0 |
+          find release-artifacts -type f \( -name '*.zip' -o -name 'Image-*' -o -name 'config-*' \) -print0 |
             while IFS= read -r -d '' file; do
               cp "$file" "$release_dir/$(basename "$file")"
             done
@@ -348,6 +356,19 @@ jobs:
                 printf '%s\n' "$version_lines"
               else
                 echo "- No artifacts produced"
+              fi
+
+              config_lines="$(
+                find release-artifacts -type f \
+                  \( -name "config-${version}-*.txt" -o -name "config-${version}-*.gz" \) \
+                  -printf '%f\n' |
+                sort
+              )"
+
+              if [ -n "$config_lines" ]; then
+                echo
+                echo "Config exports:"
+                printf '%s\n' "$config_lines" | sed 's/^/- /'
               fi
 
               echo

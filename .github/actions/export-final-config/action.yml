@@ -1,0 +1,99 @@
+name: Export final config
+description: Export final build .config as text and gzip artifacts.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version.
+  manager:
+    required: true
+    description: Manager name.
+  susfs:
+    required: true
+    description: SUSFS state.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        REQUIRED="kernel/common/private.required"
+        mkdir -p out
+
+        CANDIDATES="$(mktemp)"
+        {
+          find kernel/out kernel/common/out \
+            -type f \
+            \( -name ".config" -o -name "*.config" -o -name "*kernel*.config" \) \
+            ! -path "kernel/common/arch/arm64/configs/*" \
+            ! -path "kernel/common/private.fragment" \
+            ! -path "kernel/common/private.required" \
+            2>/dev/null || true
+        } | sort > "$CANDIDATES"
+
+        if [ ! -s "$CANDIDATES" ]; then
+          echo "::error::No final .config candidate found under kernel/out/ or kernel/common/out/."
+          exit 1
+        fi
+
+        BEST=""
+        BEST_SCORE="-1"
+
+        while read -r cfg; do
+          [ -f "$cfg" ] || continue
+          grep -q '^CONFIG_' "$cfg" || continue
+
+          SCORE=0
+
+          if [ -s "$REQUIRED" ]; then
+            while read -r line; do
+              [ -z "$line" ] && continue
+              key="${line%%=*}"
+
+              if grep -qxF "$line" "$cfg"; then
+                SCORE=$((SCORE + 2))
+              elif grep -q "^${key}=" "$cfg" || grep -q "^# ${key} is not set" "$cfg"; then
+                SCORE=$((SCORE + 1))
+              fi
+            done < "$REQUIRED"
+          else
+            SCORE=1
+          fi
+
+          echo "candidate score: $SCORE :: $cfg"
+
+          if [ "$SCORE" -gt "$BEST_SCORE" ]; then
+            BEST_SCORE="$SCORE"
+            BEST="$cfg"
+          fi
+        done < "$CANDIDATES"
+
+        if [ -z "$BEST" ]; then
+          echo "::error::No usable final .config candidate found."
+          exit 1
+        fi
+
+        export_base="out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}"
+        txt_path="${export_base}.txt"
+        gz_path="${export_base}.gz"
+
+        cp "$BEST" "$txt_path"
+        gzip -c "$BEST" > "$gz_path"
+
+        echo "== exported final config =="
+        echo "source: $BEST"
+        echo "text: $txt_path"
+        echo "gzip: $gz_path"
+
+        if [ -s "$REQUIRED" ]; then
+          echo
+          echo "== final private.required states =="
+          while read -r line; do
+            [ -z "$line" ] && continue
+            key="${line%%=*}"
+            grep -E "^${key}=|^# ${key} is not set" "$BEST" || echo "::warning::$key missing from final config"
+          done < "$REQUIRED"
+        else
+          echo
+          echo "private.required is empty; no requested config states to print"
+        fi

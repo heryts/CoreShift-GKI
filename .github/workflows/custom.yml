@@ -235,6 +235,13 @@ jobs:
         with:
           strict_config: ${{ inputs.strict_config }}
 
+      - name: Export final config
+        uses: ./.github/actions/export-final-config
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          manager: ${{ inputs.manager }}
+          susfs: ${{ inputs.susfs }}
+
       - name: Package
         uses: ./.github/actions/package-kernel
         with:
@@ -269,6 +276,14 @@ jobs:
           path: image-artifact/Image-*
           if-no-files-found: error
 
+      - name: Upload config artifact
+        if: inputs.publish_mode == 'artifact' || inputs.publish_mode == 'both'
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${{ steps.custom-name.outputs.date }}
+          path: out/config-*
+          if-no-files-found: error
+
       - name: Write release body
         if: inputs.publish_mode == 'release' || inputs.publish_mode == 'both'
         shell: bash
@@ -296,6 +311,7 @@ jobs:
           - Strict config verification: ${{ inputs.strict_config }}
           - Legacy KMI check: ${{ inputs.legacy_kmi_check }}
           - Publish mode: ${{ inputs.publish_mode }}
+          - Config exports: config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.txt, config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.gz
           - Date: ${DATE}
           - Engine: ${BUILD_ENGINE}
           EOF
@@ -309,4 +325,6 @@ jobs:
           files: |
             ${{ steps.custom-name.outputs.final_name }}.zip
             out/Image-${{ steps.custom-name.outputs.final_name }}
+            out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.txt
+            out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.gz
           body_path: release-body.md
