@@ -199,8 +199,45 @@ jobs:
         with:
           strict_config: ${{ matrix.strict_config }}
 
+      - name: Set release output names
+        id: release-name
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          susfs_label=""
+          if [ "${{ matrix.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          bbg_label=""
+          if [ "${{ matrix.baseband_guard }}" = "on" ]; then
+            bbg_label="-bbg"
+          fi
+
+          variant_suffix="${susfs_label}${bbg_label}"
+
+          upstream="$(
+            awk -F' = ' '
+              /^VERSION =/ {v=$2}
+              /^PATCHLEVEL =/ {p=$2}
+              /^SUBLEVEL =/ {s=$2}
+              /^EXTRAVERSION =/ {e=$2}
+              END {printf "%s.%s.%s%s\n", v, p, s, e}
+            ' kernel/common/Makefile
+          )"
+
+          final_name="v${upstream}-gki-${{ matrix.kernel_version }}-${{ matrix.manager }}${variant_suffix}-${DATE}"
+
+          {
+            echo "variant_suffix=${variant_suffix}"
+            echo "final_name=${final_name}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Export final config
         uses: ./.github/actions/export-final-config
+        env:
+          CONFIG_NAME_SUFFIX: ${{ steps.release-name.outputs.variant_suffix }}
         with:
           kernel_version: ${{ matrix.kernel_version }}
           manager: ${{ matrix.manager }}
@@ -212,6 +249,7 @@ jobs:
           kernel_version: ${{ matrix.kernel_version }}
           manager: ${{ matrix.manager }}
           susfs: ${{ matrix.susfs }}
+          final_name: ${{ steps.release-name.outputs.final_name }}
 
       - name: Write release manifest
         shell: bash
@@ -241,7 +279,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ matrix.kernel_version }}-${{ matrix.manager }}-susfs-${{ matrix.susfs }}-${{ env.DATE }}
+          name: kernel-${{ matrix.kernel_version }}-${{ matrix.manager }}${{ steps.release-name.outputs.variant_suffix }}-${{ env.DATE }}
           path: |
             *.zip
             out/Image-*
@@ -351,7 +389,6 @@ jobs:
                   kernel_version="$(sed -n 's/^kernel_version=//p' "$manifest")"
                   manager="$(sed -n 's/^manager=//p' "$manifest")"
                   susfs="$(sed -n 's/^susfs=//p' "$manifest")"
-
                   if [ "$kernel_version" = "$version" ]; then
                     printf -- '- %s: SUSFS %s\n' "$manager" "$susfs"
                   fi

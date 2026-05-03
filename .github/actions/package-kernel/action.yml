@@ -44,7 +44,12 @@ runs:
         if [ -n "${{ inputs.final_name }}" ]; then
           FINAL_NAME="${{ inputs.final_name }}"
         else
-          FINAL_NAME="v${UPSTREAM}-gki-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${DATE}"
+          susfs_label=""
+          if [ "${{ inputs.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          FINAL_NAME="v${UPSTREAM}-gki-${{ inputs.kernel_version }}-${{ inputs.manager }}${susfs_label}-${DATE}"
         fi
         echo "FINAL_NAME=$FINAL_NAME" >> "$GITHUB_ENV"
 

@@ -57,6 +57,19 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Set output naming
+        id: output-name
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          susfs_label=""
+          if [ "${{ inputs.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          echo "variant_suffix=${susfs_label}" >> "$GITHUB_OUTPUT"
+
       - name: Install repo
         uses: ./.github/actions/install-repo
 
@@ -200,7 +213,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: final-config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}
+          name: final-config-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.output-name.outputs.variant_suffix }}
           path: final-configs/
           if-no-files-found: warn
 
@@ -215,7 +228,7 @@ jobs:
         if: ${{ inputs.output == 'artifact' }}
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}
+          name: build-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.output-name.outputs.variant_suffix }}
           path: |
             *.zip
             out/Image-*

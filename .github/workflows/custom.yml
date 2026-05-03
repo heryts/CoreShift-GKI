@@ -128,11 +128,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          final_name="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${DATE}-${{ github.run_number }}"
+          susfs_label=""
+          if [ "${{ inputs.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          bbg_label=""
+          if [ "${{ inputs.baseband_guard }}" = "on" ]; then
+            bbg_label="-bbg"
+          fi
+
+          variant_suffix="${susfs_label}${bbg_label}"
+          final_name="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}-${DATE}-${{ github.run_number }}"
+          config_base="config-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}"
 
           {
             echo "date=${DATE}"
+            echo "variant_suffix=${variant_suffix}"
             echo "final_name=${final_name}"
+            echo "config_base=${config_base}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Install host tools
@@ -224,6 +238,8 @@ jobs:
 
       - name: Export final config
         uses: ./.github/actions/export-final-config
+        env:
+          CONFIG_NAME_SUFFIX: ${{ steps.custom-name.outputs.variant_suffix }}
         with:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
@@ -251,7 +267,7 @@ jobs:
         if: inputs.publish_mode == 'artifact' || inputs.publish_mode == 'both'
         uses: actions/upload-artifact@v4
         with:
-          name: flashable-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${{ steps.custom-name.outputs.date }}
+          name: flashable-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.custom-name.outputs.variant_suffix }}-${{ steps.custom-name.outputs.date }}
           path: artifact-root/**
           if-no-files-found: error
 
@@ -259,7 +275,7 @@ jobs:
         if: inputs.publish_mode == 'artifact' || inputs.publish_mode == 'both'
         uses: actions/upload-artifact@v4
         with:
-          name: image-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${{ steps.custom-name.outputs.date }}
+          name: image-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.custom-name.outputs.variant_suffix }}-${{ steps.custom-name.outputs.date }}
           path: image-artifact/Image-*
           if-no-files-found: error
 
@@ -267,8 +283,10 @@ jobs:
         if: inputs.publish_mode == 'artifact' || inputs.publish_mode == 'both'
         uses: actions/upload-artifact@v4
         with:
-          name: config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}-${{ steps.custom-name.outputs.date }}
-          path: out/config-*
+          name: config-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.custom-name.outputs.variant_suffix }}-${{ steps.custom-name.outputs.date }}
+          path: |
+            out/${{ steps.custom-name.outputs.config_base }}.txt
+            out/${{ steps.custom-name.outputs.config_base }}.gz
           if-no-files-found: error
 
       - name: Write release body
@@ -298,7 +316,7 @@ jobs:
           - Strict config verification: ${{ inputs.strict_config }}
           - Legacy KMI check: ${{ inputs.legacy_kmi_check }}
           - Publish mode: ${{ inputs.publish_mode }}
-          - Config exports: config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.txt, config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.gz
+          - Config exports: ${{ steps.custom-name.outputs.config_base }}.txt, ${{ steps.custom-name.outputs.config_base }}.gz
           - Date: ${DATE}
           - Engine: ${BUILD_ENGINE}
           EOF
@@ -312,6 +330,6 @@ jobs:
           files: |
             ${{ steps.custom-name.outputs.final_name }}.zip
             out/Image-${{ steps.custom-name.outputs.final_name }}
-            out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.txt
-            out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}.gz
+            out/${{ steps.custom-name.outputs.config_base }}.txt
+            out/${{ steps.custom-name.outputs.config_base }}.gz
           body_path: release-body.md

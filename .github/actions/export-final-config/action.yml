@@ -73,7 +73,8 @@ runs:
           exit 1
         fi
 
-        export_base="out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}-susfs-${{ inputs.susfs }}"
+        export_suffix="${CONFIG_NAME_SUFFIX:-}"
+        export_base="out/config-${{ inputs.kernel_version }}-${{ inputs.manager }}${export_suffix}"
         txt_path="${export_base}.txt"
         gz_path="${export_base}.gz"
 
