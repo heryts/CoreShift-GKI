@@ -8,57 +8,80 @@ on:
         required: true
         options: ["5.10", "6.1", "6.6"]
         default: "5.10"
-
       manager:
         type: choice
         required: true
-        options: ["Vanilla", "KernelSU-Next", "KernelSU", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
+        options: ["Vanilla", "KernelSU", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
         default: "Vanilla"
-
       manager_ref:
-        type: string
+        description: "Optional manager git ref/commit/tag"
         required: false
         default: ""
-
-      susfs:
-        type: choice
-        required: true
-        options: ["off", "on"]
-        default: "off"
-
       lto:
         type: choice
         required: true
         options: ["thin", "full", "none"]
         default: "thin"
-
-      output:
+      susfs:
         type: choice
         required: true
-        options: ["artifact", "release"]
-        default: "artifact"
+        options: ["on", "off"]
+        default: "off"
+      baseband_guard:
+        description: "Apply Baseband Guard / BBG patches"
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
 
 jobs:
   build:
+    name: ${{ inputs.kernel_version }} / ${{ inputs.manager }} / SUSFS ${{ inputs.susfs }} / BBG ${{ inputs.baseband_guard }}
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
 
+    env:
+      # Hidden stable defaults copied from custom.yml so Build.yml keeps the
+      # same config-fragment flow without exposing experimental toggles.
+      IKCONFIG: "on"
+      CONTAINER_CORE: "off"
+      CONTAINER_IPC: "off"
+      MOUNT_FILESYSTEMS: "on"
+      CONTAINER_NETWORKING: "off"
+      FQ_CODEL_FEATURES: "off"
+      PERFORMANCE_FEATURES: "off"
+      DEBUG_FEATURES: "off"
+      HEAVY_DEBUG_FEATURES: "off"
+      STRICT_CONFIG: "on"
+      LEGACY_KMI_CHECK: "on"
+      PUBLISH_MODE: "artifact"
+
     steps:
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.manager }}" = "Vanilla" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+            echo "::error::SUSFS requires a KernelSU-compatible manager; manager=Vanilla cannot use susfs=on"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: false
           fetch-depth: 1
 
-      - name: Setup variables
+      - name: Set variables
         uses: ./.github/actions/setup-vars
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Set output naming
-        id: output-name
+      - name: Set build output name
+        id: build-name
         shell: bash
         run: |
           set -euo pipefail
@@ -68,16 +91,35 @@ jobs:
             susfs_label="-susfs"
           fi
 
-          echo "variant_suffix=${susfs_label}" >> "$GITHUB_OUTPUT"
+          bbg_label=""
+          if [ "${{ inputs.baseband_guard }}" = "on" ]; then
+            bbg_label="-bbg"
+          fi
+
+          variant_suffix="${susfs_label}${bbg_label}"
+          final_name="build-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}-${DATE}-${{ github.run_number }}"
+          config_base="config-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}"
+
+          {
+            echo "date=${DATE}"
+            echo "variant_suffix=${variant_suffix}"
+            echo "final_name=${final_name}"
+            echo "config_base=${config_base}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install host tools
+        uses: ./.github/actions/install-host-tools
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
 
       - name: Install repo
         uses: ./.github/actions/install-repo
 
-      - name: Sync kernel
+      - name: Sync source
         uses: ./.github/actions/sync-kernel
 
       - name: Init manager
-        if: ${{ inputs.manager != 'Vanilla' }}
+        if: inputs.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
         with:
           manager: ${{ inputs.manager }}
@@ -85,172 +127,167 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Apply SUSFS
-        if: ${{ inputs.susfs == 'on' }}
+      - name: Apply SUSFS4KSU patches
+        if: inputs.susfs == 'on'
         uses: ./.github/actions/apply-susfs
         with:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
 
-      - name: Show kernel changes
-        run: |
-          set -eux
-
-          cd kernel/common
-          git status --short
-          git log --oneline -8
-          git diff --stat HEAD~1..HEAD || true
-
-      - name: Build kernel normally
-        run: |
-          set -eux
-
-          cd kernel
-
-          JOBS="$(nproc)"
-          if [ "${{ inputs.lto }}" = "full" ]; then
-            JOBS=1
-          fi
-
-          echo "BUILD_ENGINE=$BUILD_ENGINE"
-          echo "kernel_version=${{ inputs.kernel_version }}"
-          echo "manager=${{ inputs.manager }}"
-          echo "susfs=${{ inputs.susfs }}"
-          echo "lto=${{ inputs.lto }}"
-          echo "jobs=$JOBS"
-
-          if [ "$BUILD_ENGINE" = "kleaf" ]; then
-            unset BUILD_CONFIG
-
-            tools/bazel run \
-              --lto=${{ inputs.lto }} \
-              //common:kernel_aarch64_dist -- \
-              --dist_dir=out/dist
-          else
-            export BUILD_CONFIG=common/build.config.gki.aarch64
-            export LTO="${{ inputs.lto }}"
-            export SKIP_MRPROPER=1
-            export SKIP_CP_KERNEL_HDRS=1
-            export SKIP_UNSTRIPPED_MODULES=1
-            export SKIP_DEBUG_INFO=1
-
-            echo "selected BUILD_CONFIG=$BUILD_CONFIG"
-            bash build/build.sh -j"$JOBS"
-          fi
-
-      - name: Extract final config
-        if: always()
-        run: |
-          set -eux
-
-          rm -rf final-configs
-          mkdir -p final-configs
-
-          cd kernel
-
-          echo "=== Generated .config candidates ==="
-          find . \
-            -type f \
-            \( -name ".config" -o -name "*.config" -o -name "*kernel*.config" \) \
-            2>/dev/null \
-            | sort \
-            | tee ../final-configs/generated-config-paths.txt || true
-
-          while read -r cfg; do
-            [ -f "$cfg" ] || continue
-            safe="$(echo "$cfg" | sed 's#^\./##; s#[/.]#_#g')"
-            cp "$cfg" "../final-configs/${safe}.config"
-          done < ../final-configs/generated-config-paths.txt
-
-          echo
-          echo "=== Built Image candidates ==="
-          find . \
-            -type f \
-            -name Image \
-            2>/dev/null \
-            | sort \
-            | tee ../final-configs/image-paths.txt || true
-
-          IMAGE="$(head -n 1 ../final-configs/image-paths.txt || true)"
-
-          if [ -n "$IMAGE" ] && [ -f "$IMAGE" ]; then
-            echo "Using Image for IKCONFIG extraction: $IMAGE"
-
-            if [ -f common/scripts/extract-ikconfig ]; then
-              sh common/scripts/extract-ikconfig "$IMAGE" > ../final-configs/final-ikconfig.config || true
-            else
-              echo "::warning::common/scripts/extract-ikconfig not found"
-            fi
-          else
-            echo "::warning::No Image found for IKCONFIG extraction"
-          fi
-
-          if [ -s ../final-configs/final-ikconfig.config ]; then
-            FINAL_CFG="../final-configs/final-ikconfig.config"
-          else
-            FINAL_CFG="$(find ../final-configs -name '*.config' -type f | sort | head -n 1 || true)"
-          fi
-
-          if [ -n "${FINAL_CFG:-}" ] && [ -f "$FINAL_CFG" ]; then
-            cp "$FINAL_CFG" ../final-configs/final-used.config
-
-            echo
-            echo "============================================================"
-            echo "FINAL CONFIG: $FINAL_CFG"
-            echo "============================================================"
-            cat "$FINAL_CFG"
-
-            echo
-            echo "============================================================"
-            echo "KSU / SUSFS / LSM / IKCONFIG SUMMARY"
-            echo "============================================================"
-            grep -E 'CONFIG_KSU|CONFIG_SUSFS|CONFIG_KSU_SUSFS|CONFIG_LSM|CONFIG_BBG|CONFIG_SECURITY_SAFESETID|CONFIG_MODULE_SCMVERSION|CONFIG_KPROBES|CONFIG_OVERLAY_FS|CONFIG_TMPFS|CONFIG_FUSE_FS|CONFIG_IKCONFIG' "$FINAL_CFG" || true
-          else
-            echo "::warning::No final config available"
-          fi
-
-      - name: Upload final config artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Apply Baseband Guard
+        if: inputs.baseband_guard == 'on'
+        uses: ./.github/actions/apply-baseband-guard
         with:
-          name: final-config-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.output-name.outputs.variant_suffix }}
-          path: final-configs/
-          if-no-files-found: warn
+          baseband_guard: ${{ inputs.baseband_guard }}
 
-      - name: Package kernel
-        uses: ./.github/actions/package-kernel
+      - name: Create private config fragment
+        uses: ./.github/actions/create-config-fragment
+        with:
+          ikconfig: ${{ env.IKCONFIG }}
+          container_core: ${{ env.CONTAINER_CORE }}
+          container_ipc: ${{ env.CONTAINER_IPC }}
+          mount_filesystems: ${{ env.MOUNT_FILESYSTEMS }}
+          container_networking: ${{ env.CONTAINER_NETWORKING }}
+          fq_codel_features: ${{ env.FQ_CODEL_FEATURES }}
+          performance_features: ${{ env.PERFORMANCE_FEATURES }}
+          debug_features: ${{ env.DEBUG_FEATURES }}
+          heavy_debug_features: ${{ env.HEAVY_DEBUG_FEATURES }}
+          susfs: ${{ inputs.susfs }}
+          baseband_guard: ${{ inputs.baseband_guard }}
+          kernel_version: ${{ inputs.kernel_version }}
+
+      - name: Apply IPC KABI patches
+        if: env.CONTAINER_IPC == 'on'
+        uses: ./.github/actions/apply-ipc-kabi-patches
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
+      - name: Install legacy CoreShift build config
+        if: inputs.kernel_version == '5.10'
+        uses: ./.github/actions/install-legacy-private-fragment
+        with:
+          strict_config: ${{ env.STRICT_CONFIG }}
+
+      - name: Disable legacy 5.10 defconfig normalization check
+        if: inputs.kernel_version == '5.10'
+        uses: ./.github/actions/disable-legacy-defconfig-check
+
+      - name: Disable legacy 5.10 strict KMI check for private build
+        if: inputs.kernel_version == '5.10' && env.LEGACY_KMI_CHECK == 'off'
+        uses: ./.github/actions/disable-legacy-kmi-check
+
+      - name: Add swap for full LTO
+        if: inputs.lto == 'full'
+        uses: ./.github/actions/add-swap
+
+      - name: Commit kernel changes
+        uses: ./.github/actions/commit-kernel-changes
+
+      - name: Build kernel
+        uses: ./.github/actions/build-kernel
+        with:
+          lto: ${{ inputs.lto }}
+          kernel_version: ${{ inputs.kernel_version }}
+
+      - name: Verify final config
+        uses: ./.github/actions/verify-final-config
+        with:
+          strict_config: ${{ env.STRICT_CONFIG }}
+
+      - name: Export final config
+        uses: ./.github/actions/export-final-config
+        env:
+          CONFIG_NAME_SUFFIX: ${{ steps.build-name.outputs.variant_suffix }}
         with:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
           susfs: ${{ inputs.susfs }}
 
-      - name: Upload build artifact
-        if: ${{ inputs.output == 'artifact' }}
+      - name: Package
+        uses: ./.github/actions/package-kernel
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          manager: ${{ inputs.manager }}
+          susfs: ${{ inputs.susfs }}
+          final_name: ${{ steps.build-name.outputs.final_name }}
+
+      - name: Stage artifact outputs
+        if: env.PUBLISH_MODE == 'artifact' || env.PUBLISH_MODE == 'both'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifact-root image-artifact
+          cp -a ak3_work/. artifact-root/
+          cp "out/Image-${FINAL_NAME}" image-artifact/
+
+      - name: Upload flashable artifact tree
+        if: env.PUBLISH_MODE == 'artifact' || env.PUBLISH_MODE == 'both'
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.output-name.outputs.variant_suffix }}
-          path: |
-            *.zip
-            out/Image-*
-          if-no-files-found: warn
+          name: flashable-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.build-name.outputs.variant_suffix }}-${{ steps.build-name.outputs.date }}
+          path: artifact-root/**
+          if-no-files-found: error
 
-      - name: Release
-        if: ${{ inputs.output == 'release' }}
+      - name: Upload raw Image artifact
+        if: env.PUBLISH_MODE == 'artifact' || env.PUBLISH_MODE == 'both'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.build-name.outputs.variant_suffix }}-${{ steps.build-name.outputs.date }}
+          path: image-artifact/Image-*
+          if-no-files-found: error
+
+      - name: Upload config artifact
+        if: env.PUBLISH_MODE == 'artifact' || env.PUBLISH_MODE == 'both'
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.build-name.outputs.variant_suffix }}-${{ steps.build-name.outputs.date }}
+          path: |
+            out/${{ steps.build-name.outputs.config_base }}.txt
+            out/${{ steps.build-name.outputs.config_base }}.gz
+          if-no-files-found: error
+
+      - name: Write release body
+        if: env.PUBLISH_MODE == 'release' || env.PUBLISH_MODE == 'both'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > release-body.md <<EOF
+          CoreShift-GKI build
+
+          - Kernel version: ${{ inputs.kernel_version }}
+          - Manager: ${{ inputs.manager }}
+          - Manager ref: ${{ inputs.manager_ref }}
+          - SUSFS4KSU: ${{ inputs.susfs }}
+          - Baseband Guard: ${{ inputs.baseband_guard }}
+          - LTO: ${{ inputs.lto }}
+          - IKCONFIG: ${{ env.IKCONFIG }}
+          - Container core: ${{ env.CONTAINER_CORE }}
+          - Container IPC: ${{ env.CONTAINER_IPC }}
+          - Mount filesystems: ${{ env.MOUNT_FILESYSTEMS }}
+          - Container networking: ${{ env.CONTAINER_NETWORKING }}
+          - FQ/FQ_CODEL features: ${{ env.FQ_CODEL_FEATURES }}
+          - Performance features: ${{ env.PERFORMANCE_FEATURES }}
+          - Debug features: ${{ env.DEBUG_FEATURES }}
+          - Heavy debug features: ${{ env.HEAVY_DEBUG_FEATURES }}
+          - Strict config verification: ${{ env.STRICT_CONFIG }}
+          - Legacy KMI check: ${{ env.LEGACY_KMI_CHECK }}
+          - Publish mode: ${{ env.PUBLISH_MODE }}
+          - Config exports: ${{ steps.build-name.outputs.config_base }}.txt, ${{ steps.build-name.outputs.config_base }}.gz
+          - Date: ${DATE}
+          - Engine: ${BUILD_ENGINE}
+          EOF
+
+      - name: Create release
+        if: env.PUBLISH_MODE == 'release' || env.PUBLISH_MODE == 'both'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.FINAL_NAME }}
-          name: ${{ env.FINAL_NAME }}
+          tag_name: ${{ steps.build-name.outputs.final_name }}
+          name: ${{ steps.build-name.outputs.final_name }}
           files: |
-            *.zip
-            out/Image-*
-            final-configs/*
-          body: |
-            - Upstream: ${{ env.UPSTREAM_VER }}
-            - Kernel: ${{ inputs.kernel_version }}
-            - Manager: ${{ inputs.manager }}
-            - Manager ref: ${{ inputs.manager_ref }}
-            - SUSFS: ${{ inputs.susfs }}
-            - LTO: ${{ inputs.lto }}
-            - Output: ${{ inputs.output }}
-            - Date: ${{ env.DATE }}
-            - Engine: ${{ env.BUILD_ENGINE }}
+            ${{ steps.build-name.outputs.final_name }}.zip
+            out/Image-${{ steps.build-name.outputs.final_name }}
+            out/${{ steps.build-name.outputs.config_base }}.txt
+            out/${{ steps.build-name.outputs.config_base }}.gz
+          body_path: release-body.md

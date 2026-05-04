@@ -30,7 +30,7 @@ on:
         type: choice
         required: true
         options: ["on", "off"]
-        default: "on"
+        default: "off"
       container_ipc:
         type: choice
         required: true
@@ -80,7 +80,7 @@ on:
         type: choice
         required: true
         options: ["on", "off"]
-        default: "off"
+        default: "on"
       legacy_kmi_check:
         type: choice
         required: true
