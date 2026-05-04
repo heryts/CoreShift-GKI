@@ -332,17 +332,38 @@ jobs:
           {
             echo "CoreShift GKI release"
             echo
-            echo "Flashable zip files are attached here."
-            echo "Other build outputs are available in the workflow artifacts."
+            echo "- Date: $date"
+            echo "- Run: $GITHUB_RUN_NUMBER"
             echo
+            echo "Included builds:"
 
             while IFS= read -r manifest; do
               kernel_version="$(sed -n 's/^kernel_version=//p' "$manifest")"
               manager="$(sed -n 's/^manager=//p' "$manifest")"
               susfs="$(sed -n 's/^susfs=//p' "$manifest")"
-              name="$(sed -n 's/^name=//p' "$manifest")"
-              printf -- '- %s / %s / SUSFS %s: %s.zip\n' "$kernel_version" "$manager" "$susfs" "$name"
+              lto="$(sed -n 's/^lto=//p' "$manifest")"
+              baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
+
+              susfs_label="Disabled"
+              if [ "$susfs" = "on" ]; then
+                susfs_label="Enabled"
+              fi
+
+              bbg_label="Disabled"
+              if [ "$baseband_guard" = "on" ]; then
+                bbg_label="Enabled"
+              fi
+
+              printf -- '- Kernel %s | %s | LTO %s | SUSFS %s | BBG %s\n' \
+                "$kernel_version" \
+                "$manager" \
+                "$lto" \
+                "$susfs_label" \
+                "$bbg_label"
             done < <(find release-artifacts -type f -name release-manifest.txt | sort)
+
+            echo
+            echo "Extra files are available in workflow artifacts."
           } > "$body"
 
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"

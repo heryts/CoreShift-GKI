@@ -313,29 +313,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat > release-body.md <<EOF
-          Custom CoreShift-GKI build
+          susfs_label="Disabled"
+          if [ "${{ inputs.susfs }}" = "on" ]; then
+            susfs_label="Enabled"
+          fi
 
-          - Kernel version: ${{ inputs.kernel_version }}
+          bbg_label="Disabled"
+          if [ "${{ inputs.baseband_guard }}" = "on" ]; then
+            bbg_label="Enabled"
+          fi
+
+          cat > release-body.md <<EOF
+          CoreShift GKI
+
+          - Kernel: ${{ inputs.kernel_version }}
           - Manager: ${{ inputs.manager }}
-          - Manager ref: ${{ inputs.manager_ref }}
-          - SUSFS4KSU: ${{ inputs.susfs }}
           - LTO: ${{ inputs.lto }}
-          - IKCONFIG: ${{ inputs.ikconfig }}
-          - Container core: ${{ inputs.container_core }}
-          - Container IPC: ${{ inputs.container_ipc }}
-          - Mount filesystems: ${{ inputs.mount_filesystems }}
-          - Container networking: ${{ inputs.container_networking }}
-          - FQ/FQ_CODEL features: ${{ inputs.fq_codel_features }}
-          - Performance features: ${{ inputs.performance_features }}
-          - Debug features: ${{ inputs.debug_features }}
-          - Heavy debug features: ${{ inputs.heavy_debug_features }}
-          - Baseband Guard: ${{ inputs.baseband_guard }}
-          - Strict config verification: ${{ inputs.strict_config }}
-          - Legacy KMI check: ${{ inputs.legacy_kmi_check }}
+          - SUSFS: ${susfs_label}
+          - BBG: ${bbg_label}
           - Date: ${DATE}
 
-          Extra build files are available in the workflow artifacts.
+          Extra files are available in workflow artifacts.
           EOF
 
       - name: Create release
