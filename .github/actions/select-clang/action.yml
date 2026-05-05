@@ -32,6 +32,19 @@ runs:
           export PATH="$bin_dir:$PATH"
         }
 
+        print_success_summary() {
+          local mode="$1"
+          local linked_count="$2"
+          local version_line="$3"
+
+          echo "build engine: ${BUILD_ENGINE:-unknown}"
+          echo "selected clang: $CHOICE"
+          echo "clang root: ${CLANG_ROOT:-<none>}"
+          echo "override mode: $mode"
+          echo "updated clang dirs: $linked_count"
+          echo "clang version: ${version_line:-unknown}"
+        }
+
         print_failure_debug() {
           echo "== clang discovery debug ==" >&2
           echo "workspace=$GITHUB_WORKSPACE" >&2
@@ -133,17 +146,55 @@ runs:
           printf '%s\n' "$linked_count"
         }
 
+        overlay_all_synced_clang_dirs() {
+          local root="$1"
+          local selected_dir="$2"
+          local entry=""
+          local overlaid_count=0
+
+          [ -n "$root" ] || return 0
+          [ -d "$root" ] || return 0
+
+          while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+
+            if [ -L "$entry" ]; then
+              rm -f "$entry"
+              mkdir -p "$entry"
+            fi
+
+            rsync -a --delete \
+              --exclude=BUILD \
+              --exclude=BUILD.bazel \
+              --exclude='*.bzl' \
+              --exclude=MODULE.bazel \
+              --exclude=WORKSPACE \
+              --exclude=WORKSPACE.bazel \
+              "$selected_dir"/ "$entry"/
+
+            overlaid_count=$((overlaid_count + 1))
+          done < <(
+            find "$root" -mindepth 1 -maxdepth 1 -type d -name 'clang-*' 2>/dev/null | sort || true
+          )
+
+          printf '%s\n' "$overlaid_count"
+        }
+
         write_metadata() {
           local selection="$1"
           local clang_root="$2"
           local selected_dir="$3"
           local target_path="$4"
-          local linked_count="$5"
-          local clang_bin="$6"
-          local lld_bin="$7"
+          local override_mode="$5"
+          local linked_count="$6"
+          local clang_bin="$7"
+          local lld_bin="$8"
 
           {
             echo "clang_selection=$selection"
+            echo "build_engine=${BUILD_ENGINE:-unknown}"
+            echo "clang_override_mode=$override_mode"
+            echo "clang_override_root=$clang_root"
             echo "clang_root=$clang_root"
             echo "selected_dir=$selected_dir"
             echo "override_target=$target_path"
@@ -187,6 +238,8 @@ runs:
           ACTIVE_CLANG_DIR=""
         fi
 
+        CLANG_OVERRIDE_MODE="default"
+
         if [ "$CHOICE" = "default" ]; then
           if [ -n "$TARGET_CLANG_DIR" ]; then
             CLANG_BIN="$TARGET_CLANG_DIR/bin/clang"
@@ -214,10 +267,8 @@ runs:
             echo "target_dir=<none>"
             SELECTED_BIN_DIR="$(dirname "$CLANG_BIN")"
           fi
-          echo "selected clang: default"
-          echo "clang root: ${CLANG_ROOT:-<none>}"
-          echo "linked synced clang dirs: 0"
-          echo "clang version: $(clang --version | head -n 1 || echo not found)"
+          CLANG_VERSION_LINE="$(clang --version | head -n 1 || echo not found)"
+          print_success_summary "$CLANG_OVERRIDE_MODE" "0" "$CLANG_VERSION_LINE"
 
           {
             echo "CLANG_SELECTION=default"
@@ -226,10 +277,11 @@ runs:
             echo "CLANG_OVERRIDE_TARGET_NAME=$TARGET_CLANG_NAME"
             echo "CLANG_ACTIVE_DIR=$TARGET_CLANG_DIR"
             echo "CLANG_PATH=$SELECTED_BIN_DIR"
+            echo "CLANG_OVERRIDE_MODE=$CLANG_OVERRIDE_MODE"
             echo "CLANG_BACKUP_DIR="
           } >> "$GITHUB_ENV"
 
-          write_metadata "default" "$CLANG_ROOT" "$TARGET_CLANG_DIR" "$TARGET_CLANG_DIR" "0" "$CLANG_BIN" "$LLD_BIN"
+          write_metadata "default" "$CLANG_ROOT" "$TARGET_CLANG_DIR" "$TARGET_CLANG_DIR" "$CLANG_OVERRIDE_MODE" "0" "$CLANG_BIN" "$LLD_BIN"
           exit 0
         fi
 
@@ -254,8 +306,19 @@ runs:
           exit 1
         fi
 
-        LINKED_COUNT="$(link_all_synced_clang_dirs "$CLANG_ROOT" "$SELECTED_CLANG_DIR")"
-        if [ "$LINKED_COUNT" -eq 0 ]; then
+        if [ "${BUILD_ENGINE:-}" = "kleaf" ]; then
+          CLANG_OVERRIDE_MODE="kleaf-overlay"
+          UPDATED_COUNT="$(overlay_all_synced_clang_dirs "$CLANG_ROOT" "$SELECTED_CLANG_DIR")"
+          ACTIVE_CLANG_DIR="$TARGET_CLANG_DIR"
+          SELECTED_BIN_DIR="$TARGET_CLANG_DIR/bin"
+        else
+          CLANG_OVERRIDE_MODE="legacy-symlink"
+          UPDATED_COUNT="$(link_all_synced_clang_dirs "$CLANG_ROOT" "$SELECTED_CLANG_DIR")"
+          ACTIVE_CLANG_DIR="$SELECTED_CLANG_DIR"
+          SELECTED_BIN_DIR="$SELECTED_CLANG_DIR/bin"
+        fi
+
+        if [ "$UPDATED_COUNT" -eq 0 ]; then
           print_failure_debug
           echo "::error::No synced clang-* dirs found under $CLANG_ROOT"
           exit 1
@@ -271,13 +334,7 @@ runs:
 
         CLANG_VERSION_LINE="$("$SELECTED_BIN_DIR/clang" --version | head -n 1 || true)"
         "$SELECTED_BIN_DIR/ld.lld" --version >/dev/null
-
-        ACTIVE_CLANG_DIR="$SELECTED_CLANG_DIR"
-
-        echo "selected clang: $CHOICE"
-        echo "clang root: $CLANG_ROOT"
-        echo "linked synced clang dirs: $LINKED_COUNT"
-        echo "clang version: ${CLANG_VERSION_LINE:-unknown}"
+        print_success_summary "$CLANG_OVERRIDE_MODE" "$UPDATED_COUNT" "$CLANG_VERSION_LINE"
 
         {
           echo "CLANG_SELECTION=$CHOICE"
@@ -286,7 +343,8 @@ runs:
           echo "CLANG_OVERRIDE_TARGET_NAME=$TARGET_CLANG_NAME"
           echo "CLANG_ACTIVE_DIR=$ACTIVE_CLANG_DIR"
           echo "CLANG_PATH=$SELECTED_BIN_DIR"
+          echo "CLANG_OVERRIDE_MODE=$CLANG_OVERRIDE_MODE"
           echo "CLANG_BACKUP_DIR="
         } >> "$GITHUB_ENV"
 
-        write_metadata "$CHOICE" "$CLANG_ROOT" "$SELECTED_CLANG_DIR" "$TARGET_CLANG_DIR" "$LINKED_COUNT" "$SELECTED_BIN_DIR/clang" "$SELECTED_BIN_DIR/ld.lld"
+        write_metadata "$CHOICE" "$CLANG_ROOT" "$SELECTED_CLANG_DIR" "$TARGET_CLANG_DIR" "$CLANG_OVERRIDE_MODE" "$UPDATED_COUNT" "$SELECTED_BIN_DIR/clang" "$SELECTED_BIN_DIR/ld.lld"

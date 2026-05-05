@@ -48,8 +48,10 @@ runs:
         {
           echo
           echo "== build-step compiler environment =="
-          echo "PATH=$PATH"
           echo "clang_selection=${CLANG_SELECTION:-}"
+          echo "build_engine=${BUILD_ENGINE:-unknown}"
+          echo "clang_override_mode=${CLANG_OVERRIDE_MODE:-}"
+          echo "clang_override_root=${CLANG_OVERRIDE_ROOT:-}"
           echo "clang_override_target=${CLANG_OVERRIDE_TARGET:-}"
           echo "clang_active_dir=${CLANG_ACTIVE_DIR:-}"
           echo "clang_path=${CLANG_PATH:-}"
