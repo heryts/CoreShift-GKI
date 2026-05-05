@@ -29,9 +29,9 @@ It is not a universal compatibility layer. A build that boots on one device, ROM
 | Android 12 GKI | `5.10` |
 | Android 14 GKI | `6.1` |
 | Android 15 GKI | `6.6` |
+| Android 16 GKI | `6.12` |
 
 Your selected GKI version must match your device and ROM.
-The experimental release workflow also exposes `6.12` for Android 16 testing only.
 
 ## Supported Root Manager Choices
 
@@ -51,10 +51,10 @@ For your first root build, choose one manager and keep advanced features off. Co
 
 | Workflow | Purpose | Notes |
 | --- | --- | --- |
-| **Build Kernel** | Build one simpler manual kernel with stable defaults. | Good first choice. Fewer advanced config toggles than Custom. |
-| **Custom Kernel Build** | Build one kernel with advanced manual options for source, Clang, and feature testing. | Best for custom `kernel/common`, curated Clang testing, and advanced config tuning. |
-| **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. No experimental Clang selector. |
-| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions and maintained experimental `kernel/common` sources. | Experimental path. Includes experimental-only `6.12` support and may break boot, Wi-Fi, modules, root, or KMI compatibility. |
+| **Build Kernel** | Build one simpler manual kernel with stable defaults. | Uses the Google/AOSP LTS source path by default. Good first choice. |
+| **Custom Kernel Build** | Build one kernel with advanced manual options for source, Clang, and feature testing. | Stable/default source path is Google/AOSP LTS. Source override is optional. |
+| **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. Uses Google/AOSP LTS sources. |
+| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions and maintained experimental `kernel/common` sources. | Experimental path. Uses maintained GitHub `kernel/common` defaults and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
 
 Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for Clang testing.
 
@@ -84,7 +84,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 
 | Option | Meaning |
 | --- | --- |
-| `kernel_version` | Target Android GKI family: `5.10`, `6.1`, or `6.6`. |
+| `kernel_version` | Target Android GKI family: `5.10`, `6.1`, `6.6`, or `6.12`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
 | `source_repo` | Optional replacement Git repository for `kernel/common`. Stable workflows keep the default Google GKI sync path. Experimental release uses maintained source repos by default unless you override this manually. |
@@ -100,11 +100,11 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `legacy_kmi_check` | Controls the legacy 5.10 KMI check behavior. |
 | `publish_mode` | Chooses release output, artifact output, or both. |
 
-Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated. Experimental release matrix builds add curated Clang selection, maintained default source repos, optional source override, and experimental `6.12` support.
+Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated on Google/AOSP LTS sources. Experimental release matrix builds add curated Clang selection, maintained default source repos, and optional source override.
 
 ### Experimental Source Defaults
 
-The experimental release workflow uses these `kernel/common` repos by default unless you set `source_repo` yourself:
+The experimental release workflow uses these maintained `kernel/common` repos by default unless you set `source_repo` yourself:
 
 - `5.10`: `https://github.com/ramabondanp/android_kernel_common-5.10`
 - `6.1`: `https://github.com/ramabondanp/android_kernel_common-6.1`
@@ -113,13 +113,23 @@ The experimental release workflow uses these `kernel/common` repos by default un
 
 These are experimental defaults, not stable release defaults.
 
-### Experimental SUSFS Note
+### Source Policy
+
+- Stable workflows use the Google/AOSP LTS source path by default:
+  - `Build Kernel`
+  - `Custom Kernel Build`
+  - `Build Kernel Release Matrix`
+- Experimental release uses maintained GitHub `kernel/common` defaults, with optional `source_repo` / `source_ref` override.
+
+### SUSFS Note
 
 SUSFS support is validated per manager and per maintained source tree, not just per kernel version.
 
-- `5.10`, `6.1`, and `6.6` experimental maintained-source builds currently use the existing SUSFS patch sets for both `KernelSU` and `KowSU`.
-- `6.12` is experimental-only and does not ship SUSFS support yet. If you enable SUSFS for `6.12`, the workflow fails clearly until a real `gki-android16-6.12` SUSFS patch set is added.
-- Experimental source replacement, experimental Clang selection, and SUSFS together may still break build output, Wi-Fi, vendor modules, root, or boot.
+- `5.10`, `6.1`, and `6.6` are validated on the maintained experimental source path for both `KernelSU` and `KowSU`.
+- `6.12` currently uses the upstream `gki-android16-6.12` SUSFS patch set on the maintained experimental source path.
+- The default Google/AOSP `6.12` source path used by stable workflows does not yet accept the current `6.12` SUSFS patch set, so stable `6.12` workflows should keep `susfs=off` unless you switch to a compatible source override.
+- `KernelSU` and `KowSU` manager compatibility is still patch-source dependent, so custom source overrides can fail even when the default source path works.
+- Experimental source replacement, experimental Clang selection, and SUSFS together may still break build output, Wi-Fi, vendor modules, root, KMI/KCFI, or boot.
 
 ## Safety Checklist
 

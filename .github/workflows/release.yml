@@ -150,6 +150,7 @@ jobs:
         uses: ./.github/actions/apply-baseband-guard
         with:
           baseband_guard: ${{ matrix.baseband_guard }}
+          kernel_version: ${{ matrix.kernel_version }}
 
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment

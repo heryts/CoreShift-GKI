@@ -6,7 +6,7 @@ on:
       kernel_version:
         type: choice
         required: true
-        options: ["5.10", "6.1", "6.6"]
+        options: ["5.10", "6.1", "6.6", "6.12"]
       manager:
         type: choice
         required: true
@@ -115,6 +115,11 @@ jobs:
             exit 1
           fi
 
+          if [ "${{ inputs.kernel_version }}" = "6.12" ] && [ "${{ inputs.susfs }}" = "on" ] && [ -z "${{ inputs.source_repo }}" ]; then
+            echo "::error::6.12 SUSFS is currently validated only on the maintained-source path. Use the experimental workflow or set source_repo/source_ref to a compatible 6.12 source tree."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -196,6 +201,7 @@ jobs:
         uses: ./.github/actions/apply-baseband-guard
         with:
           baseband_guard: ${{ inputs.baseband_guard }}
+          kernel_version: ${{ inputs.kernel_version }}
 
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment

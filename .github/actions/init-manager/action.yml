@@ -49,16 +49,18 @@ runs:
             'KernelSU  5.10    3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
             'KernelSU  6.1     3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
             'KernelSU  6.6     3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
+            'KernelSU  6.12    3c30f77db1802d68a1cfcfb77d49c92fe93873ac' \
             'KowSU     5.10    cf087d755af8e322e6840d02b082a7b3871726c7' \
             'KowSU     6.1     cf087d755af8e322e6840d02b082a7b3871726c7' \
-            'KowSU     6.6     cf087d755af8e322e6840d02b082a7b3871726c7'
+            'KowSU     6.6     cf087d755af8e322e6840d02b082a7b3871726c7' \
+            'KowSU     6.12    cf087d755af8e322e6840d02b082a7b3871726c7'
 
           case "${MANAGER}:${KERNEL_VERSION}" in
-            KernelSU:5.10|KernelSU:6.1|KernelSU:6.6)
+            KernelSU:5.10|KernelSU:6.1|KernelSU:6.6|KernelSU:6.12)
               SELECTED_MANAGER_REF="3c30f77db1802d68a1cfcfb77d49c92fe93873ac"
               MANAGER_REF_SOURCE="susfs-default"
               ;;
-            KowSU:5.10|KowSU:6.1|KowSU:6.6)
+            KowSU:5.10|KowSU:6.1|KowSU:6.6|KowSU:6.12)
               SELECTED_MANAGER_REF="cf087d755af8e322e6840d02b082a7b3871726c7"
               MANAGER_REF_SOURCE="susfs-default"
               ;;

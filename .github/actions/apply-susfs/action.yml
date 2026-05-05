@@ -30,8 +30,7 @@ runs:
             PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
             ;;
           6.12)
-            echo "::error::SUSFS is not supported for 6.12 yet; add 6.12 SUSFS patches first."
-            exit 1
+            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android16-6.12"
             ;;
           *)
             echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
@@ -55,6 +54,9 @@ runs:
             ;;
           6.6)
             SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android15-6.6.patch"
+            ;;
+          6.12)
+            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android16-6.12.patch"
             ;;
         esac
 
@@ -101,6 +103,10 @@ runs:
         echo
         echo "== check/apply core SUSFS patch =="
         if ! git apply --check "$SUSFS_PATCH"; then
+          if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+            echo "::error::6.12 SUSFS patch does not apply to this source tree. Current 6.12 SUSFS support is validated on the maintained experimental source path, not the default Google/AOSP 6.12 source path."
+            exit 1
+          fi
           echo "::error::core SUSFS patch does not apply"
           exit 1
         fi
