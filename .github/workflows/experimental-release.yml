@@ -3,11 +3,24 @@ name: Build Experimental Kernel Release Matrix
 on:
   workflow_dispatch:
     inputs:
+      kernel_version:
+        type: choice
+        required: true
+        options: ["all", "5.10", "6.1", "6.6", "6.12"]
+        default: "all"
       clang_version:
         type: choice
         required: true
         options: ["default", "clang-r584948", "clang-r547379"]
         default: "default"
+      source_repo:
+        description: "Optional git repo URL to replace kernel/common"
+        required: false
+        default: ""
+      source_ref:
+        description: "Optional source git ref/branch/tag/commit"
+        required: false
+        default: ""
 
 jobs:
   prepare-matrix:
@@ -88,6 +101,71 @@ jobs:
                       f"default groups: {', '.join(enabled_unsafe)}"
                   )
 
+          include.extend([
+              {
+                  "kernel_version": "6.12",
+                  "manager": "Vanilla",
+                  "susfs": "off",
+                  "lto": "full",
+                  "ikconfig": "on",
+                  "container_core": "off",
+                  "container_ipc": "off",
+                  "mount_filesystems": "on",
+                  "container_networking": "off",
+                  "fq_codel_features": "off",
+                  "performance_features": "off",
+                  "debug_features": "off",
+                  "heavy_debug_features": "off",
+                  "baseband_guard": "off",
+                  "strict_config": "on",
+                  "legacy_kmi_check": "on",
+              },
+              {
+                  "kernel_version": "6.12",
+                  "manager": "KernelSU",
+                  "susfs": "off",
+                  "lto": "full",
+                  "ikconfig": "on",
+                  "container_core": "off",
+                  "container_ipc": "off",
+                  "mount_filesystems": "on",
+                  "container_networking": "off",
+                  "fq_codel_features": "off",
+                  "performance_features": "off",
+                  "debug_features": "off",
+                  "heavy_debug_features": "off",
+                  "baseband_guard": "off",
+                  "strict_config": "on",
+                  "legacy_kmi_check": "on",
+              },
+              {
+                  "kernel_version": "6.12",
+                  "manager": "KowSU",
+                  "susfs": "off",
+                  "lto": "full",
+                  "ikconfig": "on",
+                  "container_core": "off",
+                  "container_ipc": "off",
+                  "mount_filesystems": "on",
+                  "container_networking": "off",
+                  "fq_codel_features": "off",
+                  "performance_features": "off",
+                  "debug_features": "off",
+                  "heavy_debug_features": "off",
+                  "baseband_guard": "off",
+                  "strict_config": "on",
+                  "legacy_kmi_check": "on",
+              },
+          ])
+
+          requested = "${{ inputs.kernel_version }}"
+          if requested != "all":
+              include = [variant for variant in include if variant["kernel_version"] == requested]
+              if not include:
+                  raise SystemExit(f"no experimental variants matched kernel_version={requested}")
+
+          matrix["include"] = include
+
           print(json.dumps(matrix, separators=(",", ":"), sort_keys=True))
           PY
           )"
@@ -140,6 +218,62 @@ jobs:
         with:
           clang_version: ${{ inputs.clang_version }}
 
+      - name: Resolve experimental source repo
+        id: source-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          effective_source_repo="${{ inputs.source_repo }}"
+          effective_source_ref="${{ inputs.source_ref }}"
+
+          if [ -z "$effective_source_repo" ]; then
+            case "${{ matrix.kernel_version }}" in
+              5.10)
+                effective_source_repo="https://github.com/ramabondanp/android_kernel_common-5.10"
+                ;;
+              6.1)
+                effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.1"
+                ;;
+              6.6)
+                effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.6"
+                ;;
+              6.12)
+                effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.12"
+                ;;
+              *)
+                echo "::error::No experimental default source repo for kernel_version=${{ matrix.kernel_version }}"
+                exit 1
+                ;;
+            esac
+          fi
+
+          {
+            echo "source_repo=$effective_source_repo"
+            echo "source_ref=$effective_source_ref"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Replace kernel/common source
+        uses: ./.github/actions/replace-common-source
+        with:
+          source_repo: ${{ steps.source-repo.outputs.source_repo }}
+          source_ref: ${{ steps.source-repo.outputs.source_ref }}
+
+      - name: Validate experimental feature support
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.kernel_version }}" = "6.12" ] && [ "${{ matrix.susfs }}" = "on" ]; then
+            echo "::error::SUSFS is not supported for 6.12 yet; add 6.12 SUSFS patches first."
+            exit 1
+          fi
+
+          if [ "${{ matrix.kernel_version }}" = "6.12" ] && [ "${{ matrix.baseband_guard }}" = "on" ]; then
+            echo "::error::Baseband Guard is not supported for 6.12 yet; add 6.12 BBG patches first."
+            exit 1
+          fi
+
       - name: Init manager
         if: matrix.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
@@ -161,6 +295,7 @@ jobs:
         uses: ./.github/actions/apply-baseband-guard
         with:
           baseband_guard: ${{ matrix.baseband_guard }}
+          kernel_version: ${{ matrix.kernel_version }}
 
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
@@ -301,6 +436,8 @@ jobs:
             echo "susfs=${{ matrix.susfs }}"
             echo "lto=${{ matrix.lto }}"
             echo "clang_version=${{ inputs.clang_version }}"
+            echo "source_repo=${{ steps.source-repo.outputs.source_repo }}"
+            echo "source_ref=${{ steps.source-repo.outputs.source_ref }}"
             echo "ikconfig=${{ matrix.ikconfig }}"
             echo "container_core=${{ matrix.container_core }}"
             echo "container_ipc=${{ matrix.container_ipc }}"
@@ -384,6 +521,7 @@ jobs:
               lto="$(sed -n 's/^lto=//p' "$manifest")"
               baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
               clang_version="$(sed -n 's/^clang_version=//p' "$manifest")"
+              source_repo="$(sed -n 's/^source_repo=//p' "$manifest")"
               compiler_metadata="$(sed -n 's/^compiler_metadata=//p' "$manifest")"
 
               susfs_label="Disabled"
@@ -396,13 +534,14 @@ jobs:
                 bbg_label="Enabled"
               fi
 
-              printf -- '- Kernel %s | %s | LTO %s | Clang %s | SUSFS %s | BBG %s | Metadata %s\n' \
+              printf -- '- Kernel %s | %s | LTO %s | Clang %s | SUSFS %s | BBG %s | Source %s | Metadata %s\n' \
                 "$kernel_version" \
                 "$manager" \
                 "$lto" \
                 "$clang_version" \
                 "$susfs_label" \
                 "$bbg_label" \
+                "$source_repo" \
                 "$compiler_metadata"
             done < <(find release-artifacts -type f -name release-manifest.txt | sort)
 

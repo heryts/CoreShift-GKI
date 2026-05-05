@@ -26,6 +26,10 @@ runs:
             echo "BRANCH=common-android15-6.6-lts" >> "$GITHUB_ENV"
             echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
             ;;
+          6.12)
+            echo "BRANCH=common-android16-6.12" >> "$GITHUB_ENV"
+            echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
+            ;;
           *)
             echo "::error::unsupported kernel_version: ${{ inputs.kernel_version }}"
             exit 1

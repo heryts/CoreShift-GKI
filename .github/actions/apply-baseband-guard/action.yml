@@ -4,6 +4,10 @@ inputs:
   baseband_guard:
     required: true
     description: Enable Baseband Guard.
+  kernel_version:
+    required: false
+    default: ""
+    description: Kernel version used to block unsupported variants.
 runs:
   using: composite
   steps:
@@ -14,6 +18,11 @@ runs:
         if [ "${{ inputs.baseband_guard }}" != "on" ]; then
           echo "Baseband Guard off."
           exit 0
+        fi
+
+        if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+          echo "::error::Baseband Guard is not supported for 6.12 yet; add 6.12 BBG patches first."
+          exit 1
         fi
 
         BBG_VENDOR="$GITHUB_WORKSPACE/.github/patches/bbg"

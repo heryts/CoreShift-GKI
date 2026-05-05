@@ -29,6 +29,10 @@ runs:
           6.6)
             PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
             ;;
+          6.12)
+            echo "::error::SUSFS is not supported for 6.12 yet; add 6.12 SUSFS patches first."
+            exit 1
+            ;;
           *)
             echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
             exit 1

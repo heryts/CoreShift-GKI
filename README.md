@@ -53,7 +53,7 @@ For your first root build, choose one manager and keep advanced features off. Co
 | **Build Kernel** | Build one simpler manual kernel with stable defaults. | Good first choice. Fewer advanced config toggles than Custom. |
 | **Custom Kernel Build** | Build one kernel with advanced manual options for source, Clang, and feature testing. | Best for custom `kernel/common`, curated Clang testing, and advanced config tuning. |
 | **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. No experimental Clang selector. |
-| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions. | Experimental path. May break boot, Wi-Fi, modules, root, or KMI compatibility. |
+| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions and maintained experimental `kernel/common` sources. | Experimental path. Includes experimental-only `6.12` support and may break boot, Wi-Fi, modules, root, or KMI compatibility. |
 
 Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for Clang testing.
 
@@ -86,7 +86,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `kernel_version` | Target Android GKI family: `5.10`, `6.1`, or `6.6`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
-| `source_repo` | Optional replacement Git repository for `kernel/common`. Advanced testing only. |
+| `source_repo` | Optional replacement Git repository for `kernel/common`. Stable workflows keep the default Google GKI sync path. Experimental release uses maintained source repos by default unless you override this manually. |
 | `source_ref` | Optional branch, tag, or commit from `source_repo`. Not guaranteed stable. |
 | `clang_version` | Clang selector. `default` uses the synced/build-tree toolchain, `clang-r584948` uses the current curated Clang, and `clang-r547379` uses the Android 16 release Clang. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
@@ -99,7 +99,18 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `legacy_kmi_check` | Controls the legacy 5.10 KMI check behavior. |
 | `publish_mode` | Chooses release output, artifact output, or both. |
 
-Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated. Experimental release matrix builds add only the curated Clang selector on top of the same release matrix.
+Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated. Experimental release matrix builds add curated Clang selection, maintained default source repos, optional source override, and experimental `6.12` support.
+
+### Experimental Source Defaults
+
+The experimental release workflow uses these `kernel/common` repos by default unless you set `source_repo` yourself:
+
+- `5.10`: `https://github.com/ramabondanp/android_kernel_common-5.10`
+- `6.1`: `https://github.com/ramabondanp/android_kernel_common-6.1`
+- `6.6`: `https://github.com/ramabondanp/android_kernel_common-6.6`
+- `6.12`: `https://github.com/ramabondanp/android_kernel_common-6.12`
+
+These are experimental defaults, not stable release defaults.
 
 ## Safety Checklist
 
