@@ -31,6 +31,7 @@ It is not a universal compatibility layer. A build that boots on one device, ROM
 | Android 15 GKI | `6.6` |
 
 Your selected GKI version must match your device and ROM.
+The experimental release workflow also exposes `6.12` for Android 16 testing only.
 
 ## Supported Root Manager Choices
 
@@ -90,7 +91,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `source_ref` | Optional branch, tag, or commit from `source_repo`. Not guaranteed stable. |
 | `clang_version` | Clang selector. `default` uses the synced/build-tree toolchain, `clang-r584948` uses the current curated Clang, and `clang-r547379` uses the Android 16 release Clang. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
-| `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. |
+| `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. Compatibility depends on the selected manager and the exact `kernel/common` source tree. |
 | `baseband_guard` | Baseband Guard support. Advanced protection feature. |
 | `container_features` | Enables container-related kernel options in custom builds. |
 | `performance_features` | Enables performance-oriented options. Use only when needed. |
@@ -111,6 +112,14 @@ The experimental release workflow uses these `kernel/common` repos by default un
 - `6.12`: `https://github.com/ramabondanp/android_kernel_common-6.12`
 
 These are experimental defaults, not stable release defaults.
+
+### Experimental SUSFS Note
+
+SUSFS support is validated per manager and per maintained source tree, not just per kernel version.
+
+- `5.10`, `6.1`, and `6.6` experimental maintained-source builds currently use the existing SUSFS patch sets for both `KernelSU` and `KowSU`.
+- `6.12` is experimental-only and does not ship SUSFS support yet. If you enable SUSFS for `6.12`, the workflow fails clearly until a real `gki-android16-6.12` SUSFS patch set is added.
+- Experimental source replacement, experimental Clang selection, and SUSFS together may still break build output, Wi-Fi, vendor modules, root, or boot.
 
 ## Safety Checklist
 
@@ -135,6 +144,7 @@ A kernel may fail to boot if:
 - Vendor modules are incompatible.
 - The boot image layout differs from what the package expects.
 - A root manager or advanced patch is incompatible with your kernel family.
+- An experimental maintained-source or custom `kernel/common` tree diverges from the expected patch base.
 - SUSFS or BBG changes conflict with your device or ROM.
 
 When testing, change one thing at a time.

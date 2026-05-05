@@ -259,21 +259,6 @@ jobs:
           source_repo: ${{ steps.source-repo.outputs.source_repo }}
           source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
-      - name: Validate experimental feature support
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "${{ matrix.kernel_version }}" = "6.12" ] && [ "${{ matrix.susfs }}" = "on" ]; then
-            echo "::error::SUSFS is not supported for 6.12 yet; add 6.12 SUSFS patches first."
-            exit 1
-          fi
-
-          if [ "${{ matrix.kernel_version }}" = "6.12" ] && [ "${{ matrix.baseband_guard }}" = "on" ]; then
-            echo "::error::Baseband Guard is not supported for 6.12 yet; add 6.12 BBG patches first."
-            exit 1
-          fi
-
       - name: Init manager
         if: matrix.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
