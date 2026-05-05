@@ -7,6 +7,19 @@ runs:
       run: |
         set -euo pipefail
 
+        print_disk_usage() {
+          local label="$1"
+
+          echo "== disk usage: $label =="
+          df -h
+          (
+            cd "$GITHUB_WORKSPACE"
+            du -sh kernel .toolchains out 2>/dev/null || true
+          )
+        }
+
+        print_disk_usage "before source sync"
+
         mkdir kernel
         cd kernel
 
@@ -24,3 +37,5 @@ runs:
           --no-clone-bundle \
           --optimized-fetch \
           --current-branch
+
+        print_disk_usage "after source sync"

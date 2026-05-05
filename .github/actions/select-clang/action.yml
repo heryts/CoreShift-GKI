@@ -23,6 +23,17 @@ runs:
 
         mkdir -p "$TOOLCHAIN_BASE"
 
+        print_disk_usage() {
+          local label="$1"
+
+          echo "== disk usage: $label =="
+          df -h
+          (
+            cd "$GITHUB_WORKSPACE"
+            du -sh kernel .toolchains out 2>/dev/null || true
+          )
+        }
+
         print_debug() {
           local selected_root="${1:-}"
           local selected_target="${2:-}"
@@ -120,6 +131,25 @@ runs:
           return 1
         }
 
+        remove_unused_synced_clang_dirs() {
+          local root="$1"
+          local keep_name="$2"
+          local entry=""
+
+          [ -n "$root" ] || return 0
+          [ -d "$root" ] || return 0
+
+          while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            if [ "$(basename "$entry")" = "$keep_name" ]; then
+              continue
+            fi
+            rm -rf "$entry"
+          done < <(
+            find "$root" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -name 'clang-r*' 2>/dev/null | sort || true
+          )
+        }
+
         write_metadata() {
           local selection="$1"
           local selected_dir="$2"
@@ -143,6 +173,8 @@ runs:
             echo "Compare this file against uname -a or /proc/version after boot."
           } | tee "$COMPILER_INFO" > "$LOG_FILE"
         }
+
+        print_disk_usage "before clang selection"
 
         DETECTED_PATHS=()
         if mapfile -t DETECTED_PATHS < <(find_clang_root_and_target); then
@@ -201,6 +233,7 @@ runs:
           } >> "$GITHUB_ENV"
 
           write_metadata "default" "$ACTIVE_CLANG_DIR" "$TARGET_CLANG_DIR" "" "$CLANG_BIN" "$LLD_BIN"
+          print_disk_usage "after clang selection"
           exit 0
         fi
 
@@ -223,18 +256,12 @@ runs:
           exit 1
         fi
 
-        if [ -e "$BACKUP_CLANG_DIR" ]; then
-          print_debug "$CLANG_ROOT" "$TARGET_CLANG_DIR" "$BACKUP_CLANG_DIR"
-          echo "::error::Backup target already exists: $BACKUP_CLANG_DIR"
-          exit 1
-        fi
-
         echo "== curated Clang override =="
         echo "selection=$CHOICE"
         echo "selected_dir=$SELECTED_CLANG_DIR"
         echo "override_target=$TARGET_CLANG_DIR"
 
-        mv "$TARGET_CLANG_DIR" "$BACKUP_CLANG_DIR"
+        rm -rf "$TARGET_CLANG_DIR"
         ln -s "$SELECTED_CLANG_DIR" "$TARGET_CLANG_DIR"
 
         if [ ! -L "$TARGET_CLANG_DIR" ]; then
@@ -243,7 +270,10 @@ runs:
           exit 1
         fi
 
+        remove_unused_synced_clang_dirs "$CLANG_ROOT" "$TARGET_CLANG_NAME"
+
         ACTIVE_CLANG_DIR="$SELECTED_CLANG_DIR"
+        BACKUP_CLANG_DIR=""
 
         {
           echo "CLANG_SELECTION=$CHOICE"
@@ -255,3 +285,4 @@ runs:
         } >> "$GITHUB_ENV"
 
         write_metadata "$CHOICE" "$ACTIVE_CLANG_DIR" "$TARGET_CLANG_DIR" "$BACKUP_CLANG_DIR" "$CLANG_BIN" "$LLD_BIN"
+        print_disk_usage "after clang selection"
