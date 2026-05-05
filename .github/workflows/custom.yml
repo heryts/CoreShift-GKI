@@ -39,12 +39,8 @@ on:
         required: true
         options: ["on", "off"]
         default: "on"
-      container_core:
-        type: choice
-        required: true
-        options: ["on", "off"]
-        default: "off"
-      container_ipc:
+      container_features:
+        description: "Enable container-related kernel options"
         type: choice
         required: true
         options: ["on", "off"]
@@ -54,11 +50,6 @@ on:
         required: true
         options: ["on", "off"]
         default: "on"
-      container_networking:
-        type: choice
-        required: true
-        options: ["on", "off"]
-        default: "off"
       fq_codel_features:
         type: choice
         required: true
@@ -210,10 +201,10 @@ jobs:
         uses: ./.github/actions/create-config-fragment
         with:
           ikconfig: ${{ inputs.ikconfig }}
-          container_core: ${{ inputs.container_core }}
-          container_ipc: ${{ inputs.container_ipc }}
+          container_core: ${{ inputs.container_features }}
+          container_ipc: ${{ inputs.container_features }}
           mount_filesystems: ${{ inputs.mount_filesystems }}
-          container_networking: ${{ inputs.container_networking }}
+          container_networking: ${{ inputs.container_features }}
           fq_codel_features: ${{ inputs.fq_codel_features }}
           performance_features: ${{ inputs.performance_features }}
           debug_features: ${{ inputs.debug_features }}
@@ -223,7 +214,7 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply IPC KABI patches
-        if: inputs.container_ipc == 'on'
+        if: inputs.container_features == 'on'
         uses: ./.github/actions/apply-ipc-kabi-patches
         with:
           kernel_version: ${{ inputs.kernel_version }}

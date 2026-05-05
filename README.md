@@ -48,13 +48,14 @@ For your first root build, choose one manager and keep advanced features off. Co
 
 ## Build Workflows
 
-| Workflow | Purpose |
-| --- | --- |
-| **Custom Kernel Build** | Build one custom kernel with selected options. |
-| **Build Kernel Release Matrix** | Build the curated release set. |
-| **Build Kernel** | Build a simpler, less experimental kernel with fewer options. |
+| Workflow | Purpose | Notes |
+| --- | --- | --- |
+| **Build Kernel** | Build one simpler manual kernel with stable defaults. | Good first choice. Fewer advanced config toggles than Custom. |
+| **Custom Kernel Build** | Build one kernel with advanced manual options for source, Clang, and feature testing. | Best for custom `kernel/common`, curated Clang testing, and advanced config tuning. |
+| **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. No experimental Clang selector. |
+| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions. | Experimental path. May break boot, Wi-Fi, modules, root, or KMI compatibility. |
 
-Most users should start with **Build Kernel** or **Custom Kernel Build**.
+Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for Clang testing.
 
 ## Quick Start
 
@@ -85,6 +86,9 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `kernel_version` | Target Android GKI family: `5.10`, `6.1`, or `6.6`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
+| `source_repo` | Optional replacement Git repository for `kernel/common`. Advanced testing only. |
+| `source_ref` | Optional branch, tag, or commit from `source_repo`. Not guaranteed stable. |
+| `clang_version` | Clang selector. `default` uses the synced/build-tree toolchain, `clang-r584948` uses the current curated Clang, and `clang-r547379` uses the Android 16 release Clang. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
 | `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. |
 | `baseband_guard` | Baseband Guard support. Advanced protection feature. |
@@ -95,7 +99,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `legacy_kmi_check` | Controls the legacy 5.10 KMI check behavior. |
 | `publish_mode` | Chooses release output, artifact output, or both. |
 
-Some workflows intentionally show fewer options to keep normal builds simpler and safer.
+Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated. Experimental release matrix builds add only the curated Clang selector on top of the same release matrix.
 
 ## Safety Checklist
 
@@ -139,8 +143,18 @@ Typical outputs include:
 - Flashable AnyKernel zip
 - Raw kernel `Image`
 - Exported kernel config
+- `compiler-version.txt`
 
 Most users should flash the **AnyKernel zip**, not the raw `Image`.
+
+### Compiler Metadata
+
+Each workflow that publishes artifacts can include `compiler-version.txt`. It records the selected Clang path and compiler/linker version data from CI.
+
+After boot, compare it with:
+
+- `uname -a`
+- `cat /proc/version`
 
 ### Artifact Note
 
@@ -153,6 +167,7 @@ GitHub downloads artifacts as zip files. To avoid a zip-inside-zip problem, arti
 | Build failed | Re-run with fewer options. Start from `Vanilla` and thin LTO. |
 | Device bootloops | Restore your boot images or flash a known-good kernel. |
 | Full LTO build was killed | Use thin LTO. Full LTO needs more memory. |
+| Experimental Clang build breaks boot or modules | Go back to `clang_version=default` or the stable release matrix workflow. |
 | Root manager is not detected | Build the manager without SUSFS first, then test SUSFS separately. |
 | SUSFS does not work | Confirm the same manager boots without SUSFS first. |
 | BBG causes issues | Test the same build with BBG off, then compare logs. |

@@ -1,0 +1,430 @@
+name: Build Experimental Kernel Release Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      clang_version:
+        type: choice
+        required: true
+        options: ["default", "clang-r584948", "clang-r547379"]
+        default: "default"
+
+jobs:
+  prepare-matrix:
+    name: Prepare matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build variant matrix
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          matrix="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          required = {
+              "kernel_version",
+              "manager",
+              "susfs",
+              "lto",
+              "ikconfig",
+              "container_core",
+              "container_ipc",
+              "mount_filesystems",
+              "container_networking",
+              "fq_codel_features",
+              "performance_features",
+              "debug_features",
+              "heavy_debug_features",
+              "baseband_guard",
+              "strict_config",
+              "legacy_kmi_check",
+          }
+
+          matrix = json.loads(Path(".github/matrix/release.json").read_text())
+          include = matrix.get("include")
+
+          if not isinstance(include, list) or not include:
+              raise SystemExit("release matrix must contain a non-empty include list")
+
+          for index, variant in enumerate(include):
+              if not isinstance(variant, dict):
+                  raise SystemExit(f"variant {index} must be an object")
+
+              missing = sorted(required - set(variant))
+              extra = sorted(set(variant) - required)
+
+              if missing:
+                  raise SystemExit(f"variant {index} missing fields: {', '.join(missing)}")
+              if extra:
+                  raise SystemExit(f"variant {index} has unknown fields: {', '.join(extra)}")
+
+              unsafe_release_groups = {
+                  "debug_features",
+                  "heavy_debug_features",
+                  "fq_codel_features",
+                  "performance_features",
+                  "container_networking",
+              }
+              enabled_unsafe = sorted(
+                  key for key in unsafe_release_groups if variant.get(key) != "off"
+              )
+              if enabled_unsafe:
+                  label = (
+                      f"{variant['kernel_version']} / {variant['manager']} / "
+                      f"SUSFS {variant['susfs']}"
+                  )
+                  raise SystemExit(
+                      f"release variant {index} ({label}) enables unsafe release "
+                      f"default groups: {', '.join(enabled_unsafe)}"
+                  )
+
+          print(json.dumps(matrix, separators=(",", ":"), sort_keys=True))
+          PY
+          )"
+
+          echo "== matrix JSON =="
+          printf '%s\n' "$matrix"
+
+          {
+            echo "matrix<<EOF"
+            printf '%s\n' "$matrix"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.kernel_version }} / ${{ matrix.manager }} / SUSFS ${{ matrix.susfs }} / Clang ${{ inputs.clang_version }}
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Set variables
+        uses: ./.github/actions/setup-vars
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Install host tools
+        uses: ./.github/actions/install-host-tools
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Install repo
+        uses: ./.github/actions/install-repo
+
+      - name: Sync source
+        uses: ./.github/actions/sync-kernel
+
+      - name: Select Clang
+        uses: ./.github/actions/select-clang
+        with:
+          clang_version: ${{ inputs.clang_version }}
+
+      - name: Init manager
+        if: matrix.manager != 'Vanilla'
+        uses: ./.github/actions/init-manager
+        with:
+          manager: ${{ matrix.manager }}
+          manager_ref: ""
+          susfs: ${{ matrix.susfs }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Apply SUSFS4KSU patches
+        if: matrix.susfs == 'on'
+        uses: ./.github/actions/apply-susfs
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+
+      - name: Apply Baseband Guard
+        if: matrix.baseband_guard == 'on'
+        uses: ./.github/actions/apply-baseband-guard
+        with:
+          baseband_guard: ${{ matrix.baseband_guard }}
+
+      - name: Create private config fragment
+        uses: ./.github/actions/create-config-fragment
+        with:
+          ikconfig: ${{ matrix.ikconfig }}
+          container_core: ${{ matrix.container_core }}
+          container_ipc: ${{ matrix.container_ipc }}
+          mount_filesystems: ${{ matrix.mount_filesystems }}
+          container_networking: ${{ matrix.container_networking }}
+          fq_codel_features: ${{ matrix.fq_codel_features }}
+          performance_features: ${{ matrix.performance_features }}
+          debug_features: ${{ matrix.debug_features }}
+          heavy_debug_features: ${{ matrix.heavy_debug_features }}
+          susfs: ${{ matrix.susfs }}
+          baseband_guard: ${{ matrix.baseband_guard }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Apply IPC KABI patches
+        if: matrix.container_ipc == 'on'
+        uses: ./.github/actions/apply-ipc-kabi-patches
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Install legacy CoreShift build config
+        if: matrix.kernel_version == '5.10'
+        uses: ./.github/actions/install-legacy-private-fragment
+        with:
+          strict_config: ${{ matrix.strict_config }}
+
+      - name: Disable legacy 5.10 defconfig normalization check
+        if: matrix.kernel_version == '5.10'
+        uses: ./.github/actions/disable-legacy-defconfig-check
+
+      - name: Disable legacy 5.10 strict KMI check for private build
+        if: matrix.kernel_version == '5.10' && matrix.legacy_kmi_check == 'off'
+        uses: ./.github/actions/disable-legacy-kmi-check
+
+      - name: Add swap for full LTO
+        if: matrix.lto == 'full'
+        uses: ./.github/actions/add-swap
+        with:
+          size_gb: "16"
+
+      - name: Add swap for thin LTO
+        if: matrix.lto == 'thin'
+        uses: ./.github/actions/add-swap
+        with:
+          size_gb: "8"
+
+      - name: Commit kernel changes
+        uses: ./.github/actions/commit-kernel-changes
+
+      - name: Build kernel
+        uses: ./.github/actions/build-kernel
+        with:
+          lto: ${{ matrix.lto }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Write compiler metadata
+        uses: ./.github/actions/write-compiler-metadata
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Verify final config
+        uses: ./.github/actions/verify-final-config
+        with:
+          strict_config: ${{ matrix.strict_config }}
+
+      - name: Set release output names
+        id: release-name
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          susfs_label=""
+          if [ "${{ matrix.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          bbg_label=""
+          if [ "${{ matrix.baseband_guard }}" = "on" ]; then
+            bbg_label="-bbg"
+          fi
+
+          variant_suffix="${susfs_label}${bbg_label}"
+
+          upstream="$(
+            awk -F' = ' '
+              /^VERSION =/ {v=$2}
+              /^PATCHLEVEL =/ {p=$2}
+              /^SUBLEVEL =/ {s=$2}
+              /^EXTRAVERSION =/ {e=$2}
+              END {printf "%s.%s.%s%s\n", v, p, s, e}
+            ' kernel/common/Makefile
+          )"
+
+          final_name="v${upstream}-gki-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${variant_suffix}-${{ inputs.clang_version }}-${DATE}"
+          compiler_metadata_name="compiler-version-${final_name}.txt"
+
+          {
+            echo "variant_suffix=${variant_suffix}"
+            echo "final_name=${final_name}"
+            echo "compiler_metadata_name=${compiler_metadata_name}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Export final config
+        uses: ./.github/actions/export-final-config
+        env:
+          CONFIG_NAME_SUFFIX: ${{ steps.release-name.outputs.variant_suffix }}
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+          susfs: ${{ matrix.susfs }}
+
+      - name: Package
+        uses: ./.github/actions/package-kernel
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+          susfs: ${{ matrix.susfs }}
+          final_name: ${{ steps.release-name.outputs.final_name }}
+
+      - name: Stage compiler metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cp compiler-version.txt "${{ steps.release-name.outputs.compiler_metadata_name }}"
+
+      - name: Write release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "kernel_version=${{ matrix.kernel_version }}"
+            echo "manager=${{ matrix.manager }}"
+            echo "susfs=${{ matrix.susfs }}"
+            echo "lto=${{ matrix.lto }}"
+            echo "clang_version=${{ inputs.clang_version }}"
+            echo "ikconfig=${{ matrix.ikconfig }}"
+            echo "container_core=${{ matrix.container_core }}"
+            echo "container_ipc=${{ matrix.container_ipc }}"
+            echo "mount_filesystems=${{ matrix.mount_filesystems }}"
+            echo "container_networking=${{ matrix.container_networking }}"
+            echo "fq_codel_features=${{ matrix.fq_codel_features }}"
+            echo "performance_features=${{ matrix.performance_features }}"
+            echo "debug_features=${{ matrix.debug_features }}"
+            echo "heavy_debug_features=${{ matrix.heavy_debug_features }}"
+            echo "baseband_guard=${{ matrix.baseband_guard }}"
+            echo "strict_config=${{ matrix.strict_config }}"
+            echo "legacy_kmi_check=${{ matrix.legacy_kmi_check }}"
+            echo "compiler_metadata=${{ steps.release-name.outputs.compiler_metadata_name }}"
+            echo "name=${FINAL_NAME}"
+          } > release-manifest.txt
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${{ steps.release-name.outputs.variant_suffix }}-${{ inputs.clang_version }}-${{ env.DATE }}
+          path: |
+            *.zip
+            out/Image-*
+            out/config-*
+            ${{ steps.release-name.outputs.compiler_metadata_name }}
+            release-manifest.txt
+          if-no-files-found: error
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: false
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          date="$(date +'%Y%m%d')"
+          tag="coreshift-gki-exp-${date}-${GITHUB_RUN_NUMBER}-${{ inputs.clang_version }}"
+          release_dir="$PWD/release-zips"
+          body="$PWD/release-body.md"
+
+          mkdir -p "$release_dir"
+
+          find release-artifacts -type f \( -name '*.zip' -o -name 'compiler-version-*.txt' \) -print0 |
+            while IFS= read -r -d '' file; do
+              cp "$file" "$release_dir/$(basename "$file")"
+            done
+
+          if ! find "$release_dir" -type f -name '*.zip' -print -quit | grep -q .; then
+            echo "::error::Release requested but no flashable zip files were found."
+            exit 1
+          fi
+
+          {
+            echo "CoreShift GKI experimental release"
+            echo
+            echo "Stable release workflow remains the recommended path."
+            echo "Experimental Clang builds may break boot, Wi-Fi, modules, root, or KMI compatibility."
+            echo
+            echo "- Date: $date"
+            echo "- Run: $GITHUB_RUN_NUMBER"
+            echo "- Clang selection: ${{ inputs.clang_version }}"
+            echo
+            echo "Included builds:"
+
+            while IFS= read -r manifest; do
+              kernel_version="$(sed -n 's/^kernel_version=//p' "$manifest")"
+              manager="$(sed -n 's/^manager=//p' "$manifest")"
+              susfs="$(sed -n 's/^susfs=//p' "$manifest")"
+              lto="$(sed -n 's/^lto=//p' "$manifest")"
+              baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
+              clang_version="$(sed -n 's/^clang_version=//p' "$manifest")"
+              compiler_metadata="$(sed -n 's/^compiler_metadata=//p' "$manifest")"
+
+              susfs_label="Disabled"
+              if [ "$susfs" = "on" ]; then
+                susfs_label="Enabled"
+              fi
+
+              bbg_label="Disabled"
+              if [ "$baseband_guard" = "on" ]; then
+                bbg_label="Enabled"
+              fi
+
+              printf -- '- Kernel %s | %s | LTO %s | Clang %s | SUSFS %s | BBG %s | Metadata %s\n' \
+                "$kernel_version" \
+                "$manager" \
+                "$lto" \
+                "$clang_version" \
+                "$susfs_label" \
+                "$bbg_label" \
+                "$compiler_metadata"
+            done < <(find release-artifacts -type f -name release-manifest.txt | sort)
+
+            echo
+            echo "Compiler metadata files are attached as release assets."
+            echo "After boot, compare them with uname -a or cat /proc/version."
+            echo "Extra files are also available in workflow artifacts."
+          } > "$body"
+
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_BODY=$body" >> "$GITHUB_ENV"
+
+          echo "== release files =="
+          find "$release_dir" -type f -printf '%f\n' | sort
+          echo
+          echo "== release body =="
+          cat "$body"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          files: release-zips/*
+          body_path: ${{ env.RELEASE_BODY }}
