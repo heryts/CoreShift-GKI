@@ -15,7 +15,6 @@ runs:
         set -euo pipefail
 
         cd kernel
-        COMPILER_INFO="${GITHUB_WORKSPACE}/compiler-version.txt"
 
         JOBS="4"
         if [ "${{ inputs.lto }}" = "full" ]; then
@@ -86,21 +85,4 @@ runs:
             ! -path "./common/private.fragment" \
             ! -path "./common/private.required" \
             2>/dev/null | sort || true
-        fi
-
-        if [ -n "${CLANG_OVERRIDE_TARGET:-}" ] && [ -x "${CLANG_OVERRIDE_TARGET}/bin/clang" ]; then
-          {
-            echo
-            echo "[build-time compiler]"
-            echo "clang_selection=${CLANG_SELECTION:-unset}"
-            echo "active_dir=${CLANG_ACTIVE_DIR:-${CLANG_OVERRIDE_TARGET}}"
-            echo "override_target=${CLANG_OVERRIDE_TARGET}"
-            echo "backup_dir=${CLANG_BACKUP_DIR:-}"
-            echo
-            echo "[build-time clang --version]"
-            "${CLANG_OVERRIDE_TARGET}/bin/clang" --version
-            echo
-            echo "[build-time ld.lld --version]"
-            "${CLANG_OVERRIDE_TARGET}/bin/ld.lld" --version
-          } >> "$COMPILER_INFO"
         fi

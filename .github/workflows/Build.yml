@@ -219,6 +219,11 @@ jobs:
           lto: ${{ inputs.lto }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Write compiler metadata
+        uses: ./.github/actions/write-compiler-metadata
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
       - name: Verify final config
         uses: ./.github/actions/verify-final-config
         with:
@@ -251,6 +256,7 @@ jobs:
           cp -a ak3_work/. artifact-root/
           cp compiler-version.txt artifact-root/
           cp "out/Image-${FINAL_NAME}" image-artifact/
+          cp compiler-version.txt image-artifact/
 
       - name: Upload flashable artifact tree
         if: env.PUBLISH_MODE == 'artifact'
@@ -265,7 +271,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: image-${{ inputs.kernel_version }}-${{ inputs.manager }}${{ steps.build-name.outputs.variant_suffix }}-${{ steps.build-name.outputs.date }}
-          path: image-artifact/Image-*
+          path: |
+            image-artifact/Image-*
+            image-artifact/compiler-version.txt
           if-no-files-found: error
 
       - name: Upload config artifact
