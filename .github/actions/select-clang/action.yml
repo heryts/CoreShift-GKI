@@ -34,6 +34,27 @@ runs:
           )
         }
 
+        activate_clang_bin_dir() {
+          local bin_dir="$1"
+
+          echo "$bin_dir" >> "$GITHUB_PATH"
+          export PATH="$bin_dir:$PATH"
+        }
+
+        print_compiler_debug() {
+          local target_dir="${1:-}"
+          local bin_dir="${2:-}"
+
+          echo "selected target dir: ${target_dir:-<none>}"
+          echo "selected bin dir: ${bin_dir:-<none>}"
+          echo "command -v clang: $(command -v clang || echo not found)"
+          if command -v clang >/dev/null 2>&1; then
+            clang --version || true
+          else
+            echo "clang --version: not found"
+          fi
+        }
+
         print_debug() {
           local selected_root="${1:-}"
           local selected_target="${2:-}"
@@ -165,10 +186,18 @@ runs:
             echo "backup_path=$backup_path"
             echo
             echo "[clang --version]"
-            "$clang_bin" --version
+            if [ -n "$clang_bin" ] && [ -x "$clang_bin" ]; then
+              "$clang_bin" --version
+            else
+              echo "clang: not found"
+            fi
             echo
             echo "[ld.lld --version]"
-            "$lld_bin" --version
+            if [ -n "$lld_bin" ] && [ -x "$lld_bin" ]; then
+              "$lld_bin" --version
+            else
+              echo "ld.lld: not found"
+            fi
             echo
             echo "Compare this file against uname -a or /proc/version after boot."
           } | tee "$COMPILER_INFO" > "$LOG_FILE"
@@ -199,29 +228,32 @@ runs:
           if [ -n "$TARGET_CLANG_DIR" ]; then
             CLANG_BIN="$TARGET_CLANG_DIR/bin/clang"
             LLD_BIN="$TARGET_CLANG_DIR/bin/ld.lld"
+            SELECTED_BIN_DIR="$TARGET_CLANG_DIR/bin"
 
             if [ ! -x "$CLANG_BIN" ] || [ ! -x "$LLD_BIN" ]; then
               echo "::error::Detected synced Clang directory is missing expected binaries under $TARGET_CLANG_DIR"
               exit 1
             fi
 
+            activate_clang_bin_dir "$SELECTED_BIN_DIR"
             echo "== default synced Clang =="
             echo "target_dir=$TARGET_CLANG_DIR"
           else
             CLANG_BIN="$(command -v clang || true)"
             LLD_BIN="$(command -v ld.lld || true)"
 
-            if [ -z "$CLANG_BIN" ] || [ -z "$LLD_BIN" ]; then
-              echo "::error::No repo-synced Clang directory was found and PATH clang/ld.lld are unavailable"
+            if [ -z "$CLANG_BIN" ]; then
+              echo "::error::No repo-synced clang found and clang is not available in PATH"
               exit 1
             fi
 
             echo "== default PATH Clang =="
             echo "target_dir=<none>"
             ACTIVE_CLANG_DIR="$(dirname "$(dirname "$CLANG_BIN")")"
+            SELECTED_BIN_DIR="$(dirname "$CLANG_BIN")"
           fi
 
-          "$CLANG_BIN" --version
+          print_compiler_debug "$TARGET_CLANG_DIR" "$SELECTED_BIN_DIR"
 
           {
             echo "CLANG_SELECTION=default"
@@ -249,6 +281,7 @@ runs:
         SELECTED_CLANG_DIR="$AOSP_CLANG_DIR/$CHOICE"
         CLANG_BIN="$SELECTED_CLANG_DIR/bin/clang"
         LLD_BIN="$SELECTED_CLANG_DIR/bin/ld.lld"
+        SELECTED_BIN_DIR="$TARGET_CLANG_DIR/bin"
 
         if [ ! -x "$CLANG_BIN" ] || [ ! -x "$LLD_BIN" ]; then
           print_debug "$CLANG_ROOT" "$TARGET_CLANG_DIR" "$SELECTED_CLANG_DIR/bin/clang"$'\n'"$SELECTED_CLANG_DIR/bin/ld.lld"
@@ -270,10 +303,22 @@ runs:
           exit 1
         fi
 
+        activate_clang_bin_dir "$SELECTED_BIN_DIR"
+
+        if [ ! -x "$TARGET_CLANG_DIR/bin/clang" ] || [ ! -x "$TARGET_CLANG_DIR/bin/ld.lld" ]; then
+          echo "::error::Selected Clang symlink target is missing clang or ld.lld under $TARGET_CLANG_DIR/bin"
+          exit 1
+        fi
+
+        "$TARGET_CLANG_DIR/bin/clang" --version
+        "$TARGET_CLANG_DIR/bin/ld.lld" --version
+
         remove_unused_synced_clang_dirs "$CLANG_ROOT" "$TARGET_CLANG_NAME"
 
         ACTIVE_CLANG_DIR="$SELECTED_CLANG_DIR"
         BACKUP_CLANG_DIR=""
+
+        print_compiler_debug "$TARGET_CLANG_DIR" "$SELECTED_BIN_DIR"
 
         {
           echo "CLANG_SELECTION=$CHOICE"

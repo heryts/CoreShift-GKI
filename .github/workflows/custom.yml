@@ -245,6 +245,14 @@ jobs:
       - name: Add swap for full LTO
         if: inputs.lto == 'full'
         uses: ./.github/actions/add-swap
+        with:
+          size_gb: "12"
+
+      - name: Add swap for thin LTO
+        if: inputs.lto == 'thin'
+        uses: ./.github/actions/add-swap
+        with:
+          size_gb: "6"
 
       - name: Commit kernel changes
         uses: ./.github/actions/commit-kernel-changes

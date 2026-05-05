@@ -29,6 +29,15 @@ runs:
 
         cd kernel
 
+        echo "PATH=$PATH"
+        command -v clang || true
+        clang --version || true
+
+        if ! command -v clang >/dev/null 2>&1; then
+          echo "::error::clang is not available in PATH before kernel build"
+          exit 1
+        fi
+
         JOBS="4"
         if [ "${{ inputs.lto }}" = "full" ]; then
           JOBS="2"

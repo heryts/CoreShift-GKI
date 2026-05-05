@@ -1,11 +1,31 @@
 name: Add swap
-description: Add swap for full LTO builds.
+description: Add swap for LTO builds.
+inputs:
+  size_gb:
+    required: true
+    description: Requested swap size in GiB.
 runs:
   using: composite
   steps:
     - shell: bash
       run: |
         set -euo pipefail
+
+        SIZE_GB="${{ inputs.size_gb }}"
+        if ! [ "$SIZE_GB" -ge 1 ] 2>/dev/null; then
+          echo "::error::size_gb must be a positive integer, got: $SIZE_GB"
+          exit 1
+        fi
+
+        SIZE_BYTES="$((SIZE_GB * 1024 * 1024 * 1024))"
+        FALLBACK_GB="$((SIZE_GB / 2))"
+        if [ "$FALLBACK_GB" -lt 4 ]; then
+          FALLBACK_GB=4
+        fi
+        if [ "$FALLBACK_GB" -gt "$SIZE_GB" ]; then
+          FALLBACK_GB="$SIZE_GB"
+        fi
+        FALLBACK_BYTES="$((FALLBACK_GB * 1024 * 1024 * 1024))"
 
         echo "== resources before swap =="
         free -h || true
@@ -22,7 +42,7 @@ runs:
             echo lz4 | sudo tee /sys/block/zram0/comp_algorithm >/dev/null || true
           fi
 
-          if echo 8G | sudo tee /sys/block/zram0/disksize >/dev/null &&
+          if echo "${SIZE_GB}G" | sudo tee /sys/block/zram0/disksize >/dev/null &&
             sudo mkswap /dev/zram0 &&
             sudo swapon -p 100 /dev/zram0; then
             echo "zram swap enabled on /dev/zram0"
@@ -56,11 +76,13 @@ runs:
           sudo swapon -p 10 /swapfile
         }
 
-        if ! try_swap "$((16 * 1024 * 1024 * 1024))" "16G"; then
-          echo "::warning::16G swap setup failed; falling back to 8G"
-          if ! try_swap "$((8 * 1024 * 1024 * 1024))" "8G"; then
-            echo "::warning::8G swap setup failed; falling back to 4G"
-            try_swap "$((4 * 1024 * 1024 * 1024))" "4G"
+        if ! try_swap "$SIZE_BYTES" "${SIZE_GB}G"; then
+          echo "::warning::${SIZE_GB}G swap setup failed; falling back to ${FALLBACK_GB}G"
+          if ! try_swap "$FALLBACK_BYTES" "${FALLBACK_GB}G"; then
+            if [ "$FALLBACK_GB" -ne 4 ]; then
+              echo "::warning::${FALLBACK_GB}G swap setup failed; falling back to 4G"
+              try_swap "$((4 * 1024 * 1024 * 1024))" "4G"
+            fi
           fi
         fi
 
