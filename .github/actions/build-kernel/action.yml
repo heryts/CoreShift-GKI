@@ -29,7 +29,27 @@ runs:
 
         cd kernel
 
+        if [ -n "${CLANG_OVERRIDE_TARGET:-}" ] && [ -x "${CLANG_OVERRIDE_TARGET}/bin/clang" ]; then
+          export PATH="${CLANG_OVERRIDE_TARGET}/bin:$PATH"
+        elif [ -n "${CLANG_ACTIVE_DIR:-}" ] && [ -x "${CLANG_ACTIVE_DIR}/bin/clang" ]; then
+          export PATH="${CLANG_ACTIVE_DIR}/bin:$PATH"
+        else
+          FALLBACK_CLANG_BIN="$(
+            find "${GITHUB_WORKSPACE}/kernel" "${GITHUB_WORKSPACE}/.toolchains" \
+              -type f \
+              -path '*/bin/clang' \
+              -perm -111 \
+              2>/dev/null | sort | head -n 1 || true
+          )"
+          if [ -n "$FALLBACK_CLANG_BIN" ]; then
+            export PATH="$(dirname "$FALLBACK_CLANG_BIN"):$PATH"
+          fi
+        fi
+
         echo "PATH=$PATH"
+        echo "CLANG_SELECTION=${CLANG_SELECTION:-}"
+        echo "CLANG_OVERRIDE_TARGET=${CLANG_OVERRIDE_TARGET:-}"
+        echo "CLANG_ACTIVE_DIR=${CLANG_ACTIVE_DIR:-}"
         command -v clang || true
         clang --version || true
 

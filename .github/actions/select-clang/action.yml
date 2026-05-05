@@ -214,13 +214,11 @@ runs:
           CLANG_ROOT="${DETECTED_PATHS[-2]}"
           TARGET_CLANG_DIR="${DETECTED_PATHS[-1]}"
           TARGET_CLANG_NAME="$(basename "$TARGET_CLANG_DIR")"
-          BACKUP_CLANG_DIR="${TARGET_CLANG_DIR}.original"
           ACTIVE_CLANG_DIR="$TARGET_CLANG_DIR"
         else
           CLANG_ROOT=""
           TARGET_CLANG_DIR=""
           TARGET_CLANG_NAME=""
-          BACKUP_CLANG_DIR=""
           ACTIVE_CLANG_DIR=""
         fi
 
@@ -249,7 +247,6 @@ runs:
 
             echo "== default PATH Clang =="
             echo "target_dir=<none>"
-            ACTIVE_CLANG_DIR="$(dirname "$(dirname "$CLANG_BIN")")"
             SELECTED_BIN_DIR="$(dirname "$CLANG_BIN")"
           fi
 
@@ -260,11 +257,11 @@ runs:
             echo "CLANG_OVERRIDE_ROOT=$CLANG_ROOT"
             echo "CLANG_OVERRIDE_TARGET=$TARGET_CLANG_DIR"
             echo "CLANG_OVERRIDE_TARGET_NAME=$TARGET_CLANG_NAME"
-            echo "CLANG_ACTIVE_DIR=$ACTIVE_CLANG_DIR"
+            echo "CLANG_ACTIVE_DIR=$TARGET_CLANG_DIR"
             echo "CLANG_BACKUP_DIR="
           } >> "$GITHUB_ENV"
 
-          write_metadata "default" "$ACTIVE_CLANG_DIR" "$TARGET_CLANG_DIR" "" "$CLANG_BIN" "$LLD_BIN"
+          write_metadata "default" "$TARGET_CLANG_DIR" "$TARGET_CLANG_DIR" "" "$CLANG_BIN" "$LLD_BIN"
           print_disk_usage "after clang selection"
           exit 0
         fi
@@ -315,8 +312,7 @@ runs:
 
         remove_unused_synced_clang_dirs "$CLANG_ROOT" "$TARGET_CLANG_NAME"
 
-        ACTIVE_CLANG_DIR="$SELECTED_CLANG_DIR"
-        BACKUP_CLANG_DIR=""
+        ACTIVE_CLANG_DIR="$TARGET_CLANG_DIR"
 
         print_compiler_debug "$TARGET_CLANG_DIR" "$SELECTED_BIN_DIR"
 
@@ -326,8 +322,8 @@ runs:
           echo "CLANG_OVERRIDE_TARGET=$TARGET_CLANG_DIR"
           echo "CLANG_OVERRIDE_TARGET_NAME=$TARGET_CLANG_NAME"
           echo "CLANG_ACTIVE_DIR=$ACTIVE_CLANG_DIR"
-          echo "CLANG_BACKUP_DIR=$BACKUP_CLANG_DIR"
+          echo "CLANG_BACKUP_DIR="
         } >> "$GITHUB_ENV"
 
-        write_metadata "$CHOICE" "$ACTIVE_CLANG_DIR" "$TARGET_CLANG_DIR" "$BACKUP_CLANG_DIR" "$CLANG_BIN" "$LLD_BIN"
+        write_metadata "$CHOICE" "$TARGET_CLANG_DIR" "$TARGET_CLANG_DIR" "" "$TARGET_CLANG_DIR/bin/clang" "$TARGET_CLANG_DIR/bin/ld.lld"
         print_disk_usage "after clang selection"
