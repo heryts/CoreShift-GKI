@@ -29,13 +29,39 @@ runs:
           --depth=1 \
           --quiet
 
-        repo sync \
-          -c \
-          -j"$(nproc)" \
-          --force-sync \
-          --no-tags \
-          --no-clone-bundle \
-          --optimized-fetch \
-          --current-branch
+        sync_jobs="${SYNC_JOBS:-4}"
+
+        if [ "$BUILD_ENGINE" = "legacy" ]; then
+          if ! repo sync \
+            --no-clone-bundle \
+            --optimized-fetch \
+            -j"${sync_jobs}"
+          then
+            echo "::warning::legacy sync with optimized-fetch failed, retrying without optimized-fetch"
+            repo sync \
+              --no-clone-bundle \
+              -j"${sync_jobs}"
+          fi
+
+          echo
+          echo "== legacy clang candidates =="
+          find "$GITHUB_WORKSPACE/kernel" -maxdepth 8 -type f -path '*/prebuilts-master/clang/*/bin/clang' -print 2>/dev/null | sort | head -20 || true
+          find "$GITHUB_WORKSPACE/kernel" -maxdepth 8 -type f -path '*/prebuilts/clang/*/bin/clang' -print 2>/dev/null | sort | head -20 || true
+        else
+          if ! repo sync \
+            -c \
+            --no-tags \
+            --no-clone-bundle \
+            --optimized-fetch \
+            -j"${sync_jobs}"
+          then
+            echo "::warning::lightweight sync with optimized-fetch failed, retrying without optimized-fetch"
+            repo sync \
+              -c \
+              --no-tags \
+              --no-clone-bundle \
+              -j"${sync_jobs}"
+          fi
+        fi
 
         print_disk_usage "after source sync"

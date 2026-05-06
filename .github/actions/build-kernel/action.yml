@@ -74,6 +74,20 @@ runs:
           fi
           echo "private.fragment=common/private.fragment"
 
+          echo
+          echo "== clang lookup =="
+          echo "PATH=$PATH"
+          command -v clang || true
+          clang --version | head -n 1 || true
+
+          echo
+          echo "== repo clang candidates =="
+          find "$GITHUB_WORKSPACE/kernel" -maxdepth 8 -type f -path '*/bin/clang' -print 2>/dev/null | sort | head -80 || true
+
+          echo
+          echo "== build config clang refs =="
+          grep -R -nE 'CLANG|clang|LLVM|PATH' common/build.config* build 2>/dev/null | head -120 || true
+
           bash build/build.sh -j"${JOBS}"
 
           echo
