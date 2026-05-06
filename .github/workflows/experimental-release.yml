@@ -63,11 +63,11 @@ jobs:
               "legacy_kmi_check",
           }
 
-          matrix = json.loads(Path(".github/matrix/release.json").read_text())
+          matrix = json.loads(Path(".github/matrix/release_exp.json").read_text())
           include = matrix.get("include")
 
           if not isinstance(include, list) or not include:
-              raise SystemExit("release matrix must contain a non-empty include list")
+              raise SystemExit("experimental release matrix must contain a non-empty include list")
 
           for index, variant in enumerate(include):
               if not isinstance(variant, dict):
@@ -100,63 +100,6 @@ jobs:
                       f"release variant {index} ({label}) enables unsafe release "
                       f"default groups: {', '.join(enabled_unsafe)}"
                   )
-
-          include.extend([
-              {
-                  "kernel_version": "6.12",
-                  "manager": "KernelSU",
-                  "susfs": "on",
-                  "lto": "full",
-                  "ikconfig": "on",
-                  "container_core": "off",
-                  "container_ipc": "off",
-                  "mount_filesystems": "on",
-                  "container_networking": "off",
-                  "fq_codel_features": "off",
-                  "performance_features": "off",
-                  "debug_features": "off",
-                  "heavy_debug_features": "off",
-                  "baseband_guard": "off",
-                  "strict_config": "on",
-                  "legacy_kmi_check": "on",
-              },
-              {
-                  "kernel_version": "6.12",
-                  "manager": "KowSU",
-                  "susfs": "on",
-                  "lto": "full",
-                  "ikconfig": "on",
-                  "container_core": "off",
-                  "container_ipc": "off",
-                  "mount_filesystems": "on",
-                  "container_networking": "off",
-                  "fq_codel_features": "off",
-                  "performance_features": "off",
-                  "debug_features": "off",
-                  "heavy_debug_features": "off",
-                  "baseband_guard": "off",
-                  "strict_config": "on",
-                  "legacy_kmi_check": "on",
-              },
-              {
-                  "kernel_version": "6.12",
-                  "manager": "KowSU",
-                  "susfs": "on",
-                  "lto": "full",
-                  "ikconfig": "on",
-                  "container_core": "off",
-                  "container_ipc": "off",
-                  "mount_filesystems": "on",
-                  "container_networking": "off",
-                  "fq_codel_features": "off",
-                  "performance_features": "off",
-                  "debug_features": "off",
-                  "heavy_debug_features": "off",
-                  "baseband_guard": "on",
-                  "strict_config": "on",
-                  "legacy_kmi_check": "on",
-              },
-          ])
 
           requested = "${{ inputs.kernel_version }}"
           if requested != "all":
