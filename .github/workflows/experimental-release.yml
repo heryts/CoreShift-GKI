@@ -192,6 +192,12 @@ jobs:
           source_repo: ${{ steps.source-repo.outputs.source_repo }}
           source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
+      - name: Ensure expected Clang
+        uses: ./.github/actions/ensure-expected-clang
+        with:
+          enabled: "true"
+          kernel_version: ${{ matrix.kernel_version }}
+
       - name: Init manager
         if: matrix.manager != 'Vanilla'
         uses: ./.github/actions/init-manager

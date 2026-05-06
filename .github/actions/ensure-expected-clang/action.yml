@@ -1,0 +1,321 @@
+name: Ensure expected Clang
+description: Populate missing repo-expected Clang prebuilts for experimental builds.
+inputs:
+  enabled:
+    required: true
+    default: "false"
+    description: Enable experimental Clang materialization.
+  kernel_version:
+    required: true
+    description: Selected kernel version for this build.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ "${{ inputs.enabled }}" != "true" ]; then
+          echo "ensure-expected-clang: disabled"
+          exit 0
+        fi
+
+        KERNEL_ROOT="$GITHUB_WORKSPACE/kernel"
+        METADATA_FILE="$GITHUB_WORKSPACE/compiler-version.txt"
+        FALLBACK_CLANG="clang-r584948"
+        FALLBACK_REPO="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86"
+        TEMP_ROOT="${RUNNER_TEMP:-/tmp}/ensure-expected-clang-${GITHUB_RUN_ID:-$$}"
+        FALLBACK_CHECKOUT="$TEMP_ROOT/linux-x86"
+        FALLBACK_DIR="$FALLBACK_CHECKOUT/$FALLBACK_CLANG"
+
+        mkdir -p "$TEMP_ROOT"
+        touch "$METADATA_FILE"
+
+        declare -A seen_bins=()
+        declare -A seen_existing_dirs=()
+        declare -A seen_populated_dirs=()
+        declare -A seen_path_exports=()
+        declare -a expected_bins=()
+        declare -a existing_dirs=()
+        declare -a populated_dirs=()
+        declare -a path_exports=()
+
+        normalize_rel_path() {
+          local value="$1"
+
+          value="${value%\"}"
+          value="${value#\"}"
+          value="${value%\'}"
+          value="${value#\'}"
+          value="${value%%[[:space:]]*}"
+          value="${value#./}"
+          printf '%s\n' "$value"
+        }
+
+        add_expected_bin() {
+          local bin_path="$1"
+
+          if [ -z "$bin_path" ]; then
+            return
+          fi
+
+          if [[ "$bin_path" != "$KERNEL_ROOT/"* ]]; then
+            bin_path="$KERNEL_ROOT/$bin_path"
+          fi
+
+          bin_path="$(readlink -m "$bin_path")"
+
+          if [ -n "${seen_bins[$bin_path]:-}" ]; then
+            return
+          fi
+
+          seen_bins["$bin_path"]=1
+          expected_bins+=("$bin_path")
+        }
+
+        add_path_export() {
+          local bin_dir="$1"
+
+          if [ -z "$bin_dir" ] || [ -n "${seen_path_exports[$bin_dir]:-}" ]; then
+            return
+          fi
+
+          seen_path_exports["$bin_dir"]=1
+          path_exports+=("$bin_dir")
+        }
+
+        record_existing_dir() {
+          local dir_path="$1"
+
+          if [ -n "${seen_existing_dirs[$dir_path]:-}" ]; then
+            return
+          fi
+
+          seen_existing_dirs["$dir_path"]=1
+          existing_dirs+=("$dir_path")
+        }
+
+        record_populated_dir() {
+          local dir_path="$1"
+
+          if [ -n "${seen_populated_dirs[$dir_path]:-}" ]; then
+            return
+          fi
+
+          seen_populated_dirs["$dir_path"]=1
+          populated_dirs+=("$dir_path")
+        }
+
+        materialize_fallback_checkout() {
+          if [ -x "$FALLBACK_DIR/bin/clang" ]; then
+            return
+          fi
+
+          rm -rf "$FALLBACK_CHECKOUT"
+
+          git clone \
+            --depth=1 \
+            --filter=blob:none \
+            --sparse \
+            "$FALLBACK_REPO" \
+            "$FALLBACK_CHECKOUT"
+
+          git -C "$FALLBACK_CHECKOUT" sparse-checkout set "$FALLBACK_CLANG"
+
+          if [ ! -x "$FALLBACK_DIR/bin/clang" ]; then
+            echo "::error::fallback Clang not found after sparse checkout: $FALLBACK_DIR/bin/clang"
+            exit 1
+          fi
+        }
+
+        print_version_for_bin() {
+          local clang_bin="$1"
+          local lld_bin
+
+          lld_bin="$(dirname "$clang_bin")/ld.lld"
+
+          echo "clang candidate: $clang_bin"
+          "$clang_bin" --version | head -n 1 || true
+          if [ -x "$lld_bin" ]; then
+            "$lld_bin" --version | head -n 1 || true
+          fi
+        }
+
+        declare -a search_roots=()
+        for candidate in \
+          "$KERNEL_ROOT/common" \
+          "$KERNEL_ROOT/build" \
+          "$KERNEL_ROOT/prebuilts" \
+          "$KERNEL_ROOT/prebuilts-master"
+        do
+          if [ -e "$candidate" ]; then
+            search_roots+=("$candidate")
+          fi
+        done
+
+        if [ "${#search_roots[@]}" -eq 0 ]; then
+          echo "::error::no kernel source roots available for Clang detection"
+          exit 1
+        fi
+
+        while IFS= read -r ref; do
+          ref="$(normalize_rel_path "$ref")"
+          [ -n "$ref" ] || continue
+
+          case "$ref" in
+            */bin/clang)
+              add_expected_bin "$ref"
+              ;;
+            */bin)
+              add_expected_bin "$ref/clang"
+              ;;
+            *)
+              add_expected_bin "$ref/bin/clang"
+              ;;
+          esac
+        done < <(
+          grep -R -h -o -E 'prebuilts(-master)?/clang/host/linux-x86/clang-r[0-9a-z]+(/bin(/clang)?)?' "${search_roots[@]}" 2>/dev/null | sort -u || true
+        )
+
+        while IFS= read -r ref; do
+          ref="$(normalize_rel_path "$ref")"
+          [ -n "$ref" ] || continue
+          add_expected_bin "$ref/clang"
+        done < <(
+          grep -R -h -E '^[[:space:]]*CLANG_PREBUILT_BIN[[:space:]]*=' "$KERNEL_ROOT/common"/build.config* 2>/dev/null |
+            sed -E 's/^[^=]+=//; s/[[:space:]]+$//' |
+            sort -u || true
+        )
+
+        if [ -d "$KERNEL_ROOT/prebuilts/clang/host/linux-x86" ]; then
+          while IFS= read -r token; do
+            [ -n "$token" ] || continue
+            add_expected_bin "prebuilts/clang/host/linux-x86/$token/bin/clang"
+          done < <(
+            grep -R -h -o -E 'clang-r[0-9a-z]+' "$KERNEL_ROOT/common" "$KERNEL_ROOT/build" "$KERNEL_ROOT/prebuilts/clang/host/linux-x86" 2>/dev/null | sort -u || true
+          )
+        fi
+
+        if [ "$BUILD_ENGINE" = "legacy" ] && [ -d "$KERNEL_ROOT/prebuilts-master/clang/host/linux-x86" ]; then
+          while IFS= read -r token; do
+            [ -n "$token" ] || continue
+            add_expected_bin "prebuilts-master/clang/host/linux-x86/$token/bin/clang"
+          done < <(
+            grep -R -h -o -E 'clang-r[0-9a-z]+' "$KERNEL_ROOT/common" "$KERNEL_ROOT/build" "$KERNEL_ROOT/prebuilts-master/clang/host/linux-x86" 2>/dev/null | sort -u || true
+          )
+        fi
+
+        if [ "${#expected_bins[@]}" -eq 0 ]; then
+          while IFS= read -r existing_bin; do
+            [ -n "$existing_bin" ] || continue
+            add_expected_bin "$existing_bin"
+          done < <(
+            find "$KERNEL_ROOT" -maxdepth 8 -type f \
+              \( -path '*/prebuilts/clang/host/linux-x86/clang-r*/bin/clang' -o -path '*/prebuilts-master/clang/host/linux-x86/clang-r*/bin/clang' \) \
+              -print 2>/dev/null | sort -u || true
+          )
+        fi
+
+        if [ "${#expected_bins[@]}" -eq 0 ]; then
+          echo "::error::could not detect any expected Clang prebuilt paths"
+          exit 1
+        fi
+
+        echo "== expected clang bins =="
+        printf '%s\n' "${expected_bins[@]}"
+
+        for clang_bin in "${expected_bins[@]}"; do
+          clang_dir="$(dirname "$(dirname "$clang_bin")")"
+
+          if [ -x "$clang_bin" ]; then
+            record_existing_dir "$clang_dir"
+            add_path_export "$(dirname "$clang_bin")"
+            print_version_for_bin "$clang_bin"
+            continue
+          fi
+
+          materialize_fallback_checkout
+
+          mkdir -p "$(dirname "$clang_dir")"
+
+          if [ -d "$clang_dir" ]; then
+            rsync -a \
+              --exclude='BUILD' \
+              --exclude='BUILD.bazel' \
+              --exclude='*.bzl' \
+              --exclude='MODULE.bazel' \
+              --exclude='WORKSPACE' \
+              --exclude='WORKSPACE.bazel' \
+              "$FALLBACK_DIR/" \
+              "$clang_dir/"
+          else
+            mkdir -p "$clang_dir"
+            rsync -a "$FALLBACK_DIR/" "$clang_dir/"
+          fi
+
+          if [ ! -x "$clang_bin" ]; then
+            echo "::error::expected clang still missing after fallback copy: $clang_bin"
+            exit 1
+          fi
+
+          record_populated_dir "$clang_dir"
+          add_path_export "$(dirname "$clang_bin")"
+          print_version_for_bin "$clang_bin"
+        done
+
+        if [ "${#path_exports[@]}" -eq 0 ]; then
+          echo "::error::no valid Clang bin directories available after ensure step"
+          exit 1
+        fi
+
+        for bin_dir in "${path_exports[@]}"; do
+          echo "$bin_dir" >> "$GITHUB_PATH"
+        done
+
+        SELECTED_CLANG_BIN=""
+        SELECTED_LLD_BIN=""
+        for clang_bin in "${expected_bins[@]}"; do
+          if [ -x "$clang_bin" ]; then
+            SELECTED_CLANG_BIN="$clang_bin"
+            SELECTED_LLD_BIN="$(dirname "$clang_bin")/ld.lld"
+            break
+          fi
+        done
+
+        {
+          echo
+          echo "== ensure expected clang =="
+          echo "kernel_version=${{ inputs.kernel_version }}"
+          echo "build_engine=${BUILD_ENGINE:-unknown}"
+          echo "fallback_clang=${FALLBACK_CLANG}"
+          echo "expected_dir_count=${#expected_bins[@]}"
+          for clang_bin in "${expected_bins[@]}"; do
+            echo "expected_dir=$(dirname "$(dirname "$clang_bin")")"
+          done
+          for dir_path in "${existing_dirs[@]}"; do
+            echo "existing_dir=$dir_path"
+          done
+          for dir_path in "${populated_dirs[@]}"; do
+            echo "populated_dir=$dir_path"
+          done
+          echo "exported_bin_dir=${path_exports[0]}"
+
+          echo
+          echo "== ensure-expected-clang clang --version =="
+          if [ -n "$SELECTED_CLANG_BIN" ]; then
+            "$SELECTED_CLANG_BIN" --version || true
+          else
+            echo "clang: not found"
+          fi
+
+          echo
+          echo "== ensure-expected-clang ld.lld --version =="
+          if [ -n "$SELECTED_LLD_BIN" ] && [ -x "$SELECTED_LLD_BIN" ]; then
+            "$SELECTED_LLD_BIN" --version || true
+          else
+            echo "ld.lld: not found"
+          fi
+        } >> "$METADATA_FILE"
+
+        echo "== ensured clang bin dirs =="
+        printf '%s\n' "${path_exports[@]}"
