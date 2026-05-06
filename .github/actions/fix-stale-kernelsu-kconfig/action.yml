@@ -1,5 +1,11 @@
-name: Fix stale KernelSU Kconfig include
-description: Remove stale 6.12 KernelSU staging Kconfig include when its target is missing.
+name: Fix stale KernelSU staging refs
+description: Remove stale KernelSU staging Kconfig/Makefile refs from replaced sources.
+
+inputs:
+  remove_bundled_staging:
+    required: false
+    default: "false"
+    description: Remove bundled drivers/staging/kernelsu leftovers from maintained/custom sources.
 
 runs:
   using: composite
@@ -10,17 +16,52 @@ runs:
 
         cd kernel/common
 
-        stale='source "drivers/staging/kernelsu/kernel/Kconfig"'
-        target='drivers/staging/kernelsu/kernel/Kconfig'
+        stale_kconfig='source "drivers/staging/kernelsu/kernel/Kconfig"'
+        staging_makefile_target='drivers/staging/kernelsu/kernel/Makefile'
 
-        if [ -f drivers/staging/Kconfig ] && grep -qF "$stale" drivers/staging/Kconfig; then
-          if [ ! -f "$target" ]; then
-            echo "Removing stale KernelSU staging Kconfig include: $stale"
+        if [ "${{ inputs.remove_bundled_staging }}" = "true" ]; then
+          if [ -d drivers/staging/kernelsu ]; then
+            echo "Removing bundled KernelSU staging tree: drivers/staging/kernelsu"
+            rm -rf drivers/staging/kernelsu
+          fi
+
+          if [ -f drivers/staging/Kconfig ] && grep -qF "$stale_kconfig" drivers/staging/Kconfig; then
+            echo "Removing stale KernelSU staging Kconfig include: $stale_kconfig"
             sed -i '\#source "drivers/staging/kernelsu/kernel/Kconfig"#d' drivers/staging/Kconfig
-          else
-            echo "KernelSU staging Kconfig exists; keeping include"
+          fi
+
+          if [ -f drivers/staging/Makefile ] && grep -qE 'kernelsu/kernel|drivers/staging/kernelsu' drivers/staging/Makefile; then
+            echo "Removing stale KernelSU staging Makefile refs"
+            sed -i -E '\#kernelsu/kernel|drivers/staging/kernelsu#d' drivers/staging/Makefile
+          fi
+        elif [ ! -f "$staging_makefile_target" ]; then
+          if [ -f drivers/staging/Kconfig ] && grep -qF "$stale_kconfig" drivers/staging/Kconfig; then
+            echo "Removing stale KernelSU staging Kconfig include: $stale_kconfig"
+            sed -i '\#source "drivers/staging/kernelsu/kernel/Kconfig"#d' drivers/staging/Kconfig
+          fi
+
+          if [ -f drivers/staging/Makefile ] && grep -qE 'kernelsu/kernel|drivers/staging/kernelsu' drivers/staging/Makefile; then
+            echo "Removing stale KernelSU staging Makefile refs"
+            sed -i -E '\#kernelsu/kernel|drivers/staging/kernelsu#d' drivers/staging/Makefile
+          fi
+        else
+          echo "KernelSU staging Makefile exists; keeping staging refs"
+          if [ -f drivers/staging/Kconfig ] && grep -qF "$stale_kconfig" drivers/staging/Kconfig; then
+            if [ -f drivers/staging/kernelsu/kernel/Kconfig ]; then
+              echo "KernelSU staging Kconfig exists; keeping include"
+            else
+              echo "::error::KernelSU staging Makefile exists but Kconfig target is missing"
+              exit 1
+            fi
           fi
         fi
 
-        echo "== KernelSU Kconfig includes =="
-        grep -R -n 'kernelsu.*/Kconfig\|KernelSU.*/Kconfig' drivers Kconfig 2>/dev/null || true
+        echo "== stale KernelSU staging refs =="
+        grep -R -n 'drivers/staging/kernelsu\|kernelsu/kernel' drivers/staging 2>/dev/null || true
+
+        if grep -R -q 'kernelsu/kernel' drivers/staging 2>/dev/null; then
+          if [ ! -f drivers/staging/kernelsu/kernel/Makefile ]; then
+            echo "::error::stale drivers/staging/kernelsu/kernel reference remains"
+            exit 1
+          fi
+        fi

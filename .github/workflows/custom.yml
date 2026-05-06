@@ -228,6 +228,12 @@ jobs:
           source_repo: ${{ steps.source-repo.outputs.source_repo }}
           source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
+      - name: Clean bundled KernelSU staging leftovers
+        if: inputs.source_mode != 'google-lts'
+        uses: ./.github/actions/fix-stale-kernelsu-kconfig
+        with:
+          remove_bundled_staging: "true"
+
       - name: Ensure expected Clang
         if: inputs.source_mode != 'google-lts'
         uses: ./.github/actions/ensure-expected-clang
@@ -236,7 +242,7 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Fix stale KernelSU Kconfig include
-        if: inputs.kernel_version == '6.12'
+        if: inputs.kernel_version == '6.12' && inputs.source_mode == 'google-lts'
         uses: ./.github/actions/fix-stale-kernelsu-kconfig
 
       - name: Init manager
