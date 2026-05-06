@@ -170,6 +170,10 @@ jobs:
           source_repo: ${{ inputs.source_repo }}
           source_ref: ${{ inputs.source_ref }}
 
+      - name: Fix stale KernelSU Kconfig include
+        if: inputs.kernel_version == '6.12'
+        uses: ./.github/actions/fix-stale-kernelsu-kconfig
+
       - name: Init manager
         if: inputs.manager != 'Vanilla'
         uses: ./.github/actions/init-manager

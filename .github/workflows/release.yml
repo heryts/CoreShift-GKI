@@ -129,6 +129,10 @@ jobs:
       - name: Sync source
         uses: ./.github/actions/sync-kernel
 
+      - name: Fix stale KernelSU Kconfig include
+        if: matrix.kernel_version == '6.12'
+        uses: ./.github/actions/fix-stale-kernelsu-kconfig
+
       - name: Init manager
         if: matrix.manager != 'Vanilla'
         uses: ./.github/actions/init-manager

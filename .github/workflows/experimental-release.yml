@@ -192,6 +192,10 @@ jobs:
           source_repo: ${{ steps.source-repo.outputs.source_repo }}
           source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
+      - name: Fix stale KernelSU Kconfig include
+        if: matrix.kernel_version == '6.12'
+        uses: ./.github/actions/fix-stale-kernelsu-kconfig
+
       - name: Ensure expected Clang
         uses: ./.github/actions/ensure-expected-clang
         with:

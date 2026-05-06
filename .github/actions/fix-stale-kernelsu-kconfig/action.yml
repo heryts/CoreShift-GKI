@@ -1,0 +1,26 @@
+name: Fix stale KernelSU Kconfig include
+description: Remove stale 6.12 KernelSU staging Kconfig include when its target is missing.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        cd kernel/common
+
+        stale='source "drivers/staging/kernelsu/kernel/Kconfig"'
+        target='drivers/staging/kernelsu/kernel/Kconfig'
+
+        if [ -f drivers/staging/Kconfig ] && grep -qF "$stale" drivers/staging/Kconfig; then
+          if [ ! -f "$target" ]; then
+            echo "Removing stale KernelSU staging Kconfig include: $stale"
+            sed -i '\#source "drivers/staging/kernelsu/kernel/Kconfig"#d' drivers/staging/Kconfig
+          else
+            echo "KernelSU staging Kconfig exists; keeping include"
+          fi
+        fi
+
+        echo "== KernelSU Kconfig includes =="
+        grep -R -n 'kernelsu.*/Kconfig\|KernelSU.*/Kconfig' drivers Kconfig 2>/dev/null || true
