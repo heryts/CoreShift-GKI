@@ -16,58 +16,6 @@ runs:
 
         cd kernel
 
-        if [ -n "${CLANG_PATH:-}" ] && [ -x "${CLANG_PATH}/clang" ]; then
-          export PATH="${CLANG_PATH}:$PATH"
-        elif [ -n "${CLANG_ACTIVE_DIR:-}" ] && [ -x "${CLANG_ACTIVE_DIR}/bin/clang" ]; then
-          export PATH="${CLANG_ACTIVE_DIR}/bin:$PATH"
-        else
-          FALLBACK_CLANG_BIN="$(
-            find "${GITHUB_WORKSPACE}/kernel" "${GITHUB_WORKSPACE}/.toolchains" \
-              -type f \
-              -path '*/bin/clang' \
-              -perm -111 \
-              2>/dev/null | sort | head -n 1 || true
-          )"
-          if [ -n "$FALLBACK_CLANG_BIN" ]; then
-            export PATH="$(dirname "$FALLBACK_CLANG_BIN"):$PATH"
-          fi
-        fi
-
-        CLANG_CMD="$(command -v clang || true)"
-        echo "command -v clang: ${CLANG_CMD:-not found}"
-        if [ -n "$CLANG_CMD" ]; then
-          CLANG_VERSION_LINE="$(clang --version | head -n 1 || true)"
-          echo "clang version: ${CLANG_VERSION_LINE:-unknown}"
-        fi
-
-        if [ -z "$CLANG_CMD" ]; then
-          echo "::error::clang is not available in PATH before kernel build"
-          exit 1
-        fi
-
-        {
-          echo
-          echo "== build-step compiler environment =="
-          echo "clang_selection=${CLANG_SELECTION:-}"
-          echo "build_engine=${BUILD_ENGINE:-unknown}"
-          echo "clang_override_mode=${CLANG_OVERRIDE_MODE:-}"
-          echo "clang_override_root=${CLANG_OVERRIDE_ROOT:-}"
-          echo "clang_override_target=${CLANG_OVERRIDE_TARGET:-}"
-          echo "clang_active_dir=${CLANG_ACTIVE_DIR:-}"
-          echo "clang_path=${CLANG_PATH:-}"
-          echo "[command -v clang]"
-          echo "$CLANG_CMD"
-          echo
-          echo "[clang --version]"
-          clang --version || true
-          echo
-          echo "[command -v ld.lld]"
-          command -v ld.lld || echo "ld.lld: not found"
-          echo
-          echo "[ld.lld --version]"
-          ld.lld --version || echo "ld.lld: not found"
-        } >> "${GITHUB_WORKSPACE}/compiler-version.txt"
-
         JOBS="4"
         if [ "${{ inputs.lto }}" = "full" ]; then
           JOBS="2"

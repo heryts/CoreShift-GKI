@@ -13,35 +13,45 @@ runs:
       run: |
         set -euo pipefail
 
-        CLANG_PATH="$(command -v clang || true)"
-        LLD_PATH="$(command -v ld.lld || true)"
+        DETECTED_CLANG_BIN="$(command -v clang || true)"
+        DETECTED_LLD_BIN="$(command -v ld.lld || true)"
 
         {
           echo
           echo "== post-build compiler metadata =="
           echo "kernel_version=${{ inputs.kernel_version }}"
-          echo "clang_selection=${CLANG_SELECTION:-default}"
-          echo "clang_override_target=${CLANG_OVERRIDE_TARGET:-}"
-          echo "clang_active_dir=${CLANG_ACTIVE_DIR:-}"
-          echo "clang_backup_dir=${CLANG_BACKUP_DIR:-}"
           echo "build_engine=${BUILD_ENGINE:-unknown}"
           echo "date=${DATE:-unknown}"
           echo "github_run_number=${GITHUB_RUN_NUMBER:-unknown}"
 
           echo
-          echo "== clang =="
-          if [ -n "$CLANG_PATH" ]; then
-            echo "$CLANG_PATH"
-            clang --version || echo "clang --version failed"
+          echo "== command -v clang =="
+          if [ -n "$DETECTED_CLANG_BIN" ]; then
+            echo "$DETECTED_CLANG_BIN"
           else
             echo "clang: not found"
           fi
 
           echo
-          echo "== ld.lld =="
-          if [ -n "$LLD_PATH" ]; then
-            echo "$LLD_PATH"
-            ld.lld --version || echo "ld.lld --version failed"
+          echo "== clang --version =="
+          if [ -n "$DETECTED_CLANG_BIN" ]; then
+            clang --version || true
+          else
+            echo "clang: not found"
+          fi
+
+          echo
+          echo "== command -v ld.lld =="
+          if [ -n "$DETECTED_LLD_BIN" ]; then
+            echo "$DETECTED_LLD_BIN"
+          else
+            echo "ld.lld: not found"
+          fi
+
+          echo
+          echo "== ld.lld --version =="
+          if [ -n "$DETECTED_LLD_BIN" ]; then
+            ld.lld --version || true
           else
             echo "ld.lld: not found"
           fi

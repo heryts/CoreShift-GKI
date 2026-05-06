@@ -89,7 +89,6 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
 | `source_repo` | Optional replacement Git repository for `kernel/common`. Stable workflows keep the default Google GKI sync path. Experimental release uses maintained source repos by default unless you override this manually. |
 | `source_ref` | Optional branch, tag, or commit from `source_repo`. Not guaranteed stable. |
-| `clang_version` | Clang selector. `default` uses the synced/build-tree toolchain, `clang-r584948` uses the current curated Clang, and `clang-r547379` uses the Android 16 release Clang. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
 | `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. Compatibility depends on the selected manager and the exact `kernel/common` source tree. |
 | `baseband_guard` | Baseband Guard support. Advanced protection feature. |
@@ -100,7 +99,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `legacy_kmi_check` | Controls the legacy 5.10 KMI check behavior. |
 | `publish_mode` | Chooses release output, artifact output, or both. |
 
-Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated on Google/AOSP LTS sources. Experimental release matrix builds add curated Clang selection, maintained default source repos, and optional source override.
+Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated on Google/AOSP LTS sources. Experimental release matrix builds use maintained default source repos, and optional source override.
 
 ### Release Matrix Files
 
@@ -137,7 +136,7 @@ SUSFS support is validated per manager and per maintained source tree, not just 
 - `6.12` currently uses the upstream `gki-android16-6.12` SUSFS patch set on the maintained experimental source path.
 - The default Google/AOSP `6.12` source path used by stable workflows does not yet accept the current `6.12` SUSFS patch set, so the stable release matrix does not include `6.12` SUSFS variants. Use the experimental maintained-source path or a compatible source override for `6.12` SUSFS.
 - `KernelSU` and `KowSU` manager compatibility is still patch-source dependent, so custom source overrides can fail even when the default source path works.
-- Experimental source replacement, experimental Clang selection, and SUSFS together may still break build output, Wi-Fi, vendor modules, root, KMI/KCFI, or boot.
+- Experimental source replacement and SUSFS together may still break build output, Wi-Fi, vendor modules, root, KMI/KCFI, or boot.
 
 ## Safety Checklist
 
@@ -188,7 +187,7 @@ Most users should flash the **AnyKernel zip**, not the raw `Image`.
 
 ### Compiler Metadata
 
-Each workflow that publishes artifacts can include `compiler-version.txt`. It records the selected Clang path and compiler/linker version data from CI.
+Builds use the toolchain selected by the Android kernel source/build system. `compiler-version.txt` records the compiler visible after the build so users can compare it with `uname -a` or `/proc/version`.
 
 After boot, compare it with:
 
@@ -206,7 +205,7 @@ GitHub downloads artifacts as zip files. To avoid a zip-inside-zip problem, arti
 | Build failed | Re-run with fewer options. Start from `Vanilla` and thin LTO. |
 | Device bootloops | Restore your boot images or flash a known-good kernel. |
 | Full LTO build was killed | Use thin LTO. Full LTO needs more memory. |
-| Experimental Clang build breaks boot or modules | Go back to `clang_version=default` or the stable release matrix workflow. |
+| Experimental maintained-source build breaks boot or modules | Go back to the stable release matrix workflow or test a simpler maintained-source build first. |
 | Root manager is not detected | Build the manager without SUSFS first, then test SUSFS separately. |
 | SUSFS does not work | Confirm the same manager boots without SUSFS first. |
 | BBG causes issues | Test the same build with BBG off, then compare logs. |

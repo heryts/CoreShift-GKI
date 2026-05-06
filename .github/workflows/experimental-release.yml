@@ -8,11 +8,6 @@ on:
         required: true
         options: ["all", "5.10", "6.1", "6.6", "6.12"]
         default: "all"
-      clang_version:
-        type: choice
-        required: true
-        options: ["default", "clang-r584948", "clang-r547379"]
-        default: "default"
       source_repo:
         description: "Optional git repo URL to replace kernel/common"
         required: false
@@ -123,7 +118,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   build:
-    name: ${{ matrix.kernel_version }} / ${{ matrix.manager }} / SUSFS ${{ matrix.susfs }} / Clang ${{ inputs.clang_version }}
+    name: ${{ matrix.kernel_version }} / ${{ matrix.manager }} / SUSFS ${{ matrix.susfs }}
     runs-on: ubuntu-latest
     needs: prepare-matrix
     strategy:
@@ -155,11 +150,6 @@ jobs:
 
       - name: Sync source
         uses: ./.github/actions/sync-kernel
-
-      - name: Select Clang
-        uses: ./.github/actions/select-clang
-        with:
-          clang_version: ${{ inputs.clang_version }}
 
       - name: Resolve experimental source repo
         id: source-repo
@@ -320,7 +310,7 @@ jobs:
             ' kernel/common/Makefile
           )"
 
-          final_name="v${upstream}-gki-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${variant_suffix}-${{ inputs.clang_version }}-${DATE}"
+          final_name="v${upstream}-gki-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${variant_suffix}-${DATE}"
           compiler_metadata_name="compiler-version-${final_name}.txt"
 
           {
@@ -363,7 +353,6 @@ jobs:
             echo "manager=${{ matrix.manager }}"
             echo "susfs=${{ matrix.susfs }}"
             echo "lto=${{ matrix.lto }}"
-            echo "clang_version=${{ inputs.clang_version }}"
             echo "source_repo=${{ steps.source-repo.outputs.source_repo }}"
             echo "source_ref=${{ steps.source-repo.outputs.source_ref }}"
             echo "ikconfig=${{ matrix.ikconfig }}"
@@ -385,7 +374,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${{ steps.release-name.outputs.variant_suffix }}-${{ inputs.clang_version }}-${{ env.DATE }}
+          name: kernel-exp-${{ matrix.kernel_version }}-${{ matrix.manager }}${{ steps.release-name.outputs.variant_suffix }}-${{ env.DATE }}
           path: |
             *.zip
             out/Image-*
@@ -414,7 +403,7 @@ jobs:
           set -euo pipefail
 
           date="$(date +'%Y%m%d')"
-          tag="coreshift-gki-exp-${date}-${GITHUB_RUN_NUMBER}-${{ inputs.clang_version }}"
+          tag="coreshift-gki-exp-${date}-${GITHUB_RUN_NUMBER}"
           release_dir="$PWD/release-zips"
           body="$PWD/release-body.md"
 
@@ -434,11 +423,10 @@ jobs:
             echo "CoreShift GKI experimental release"
             echo
             echo "Stable release workflow remains the recommended path."
-            echo "Experimental Clang builds may break boot, Wi-Fi, modules, root, or KMI compatibility."
+            echo "Experimental maintained-source builds may break boot, Wi-Fi, modules, root, or KMI compatibility."
             echo
             echo "- Date: $date"
             echo "- Run: $GITHUB_RUN_NUMBER"
-            echo "- Clang selection: ${{ inputs.clang_version }}"
             echo
             echo "Included builds:"
 
@@ -448,7 +436,6 @@ jobs:
               susfs="$(sed -n 's/^susfs=//p' "$manifest")"
               lto="$(sed -n 's/^lto=//p' "$manifest")"
               baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
-              clang_version="$(sed -n 's/^clang_version=//p' "$manifest")"
               source_repo="$(sed -n 's/^source_repo=//p' "$manifest")"
               compiler_metadata="$(sed -n 's/^compiler_metadata=//p' "$manifest")"
 
@@ -462,11 +449,10 @@ jobs:
                 bbg_label="Enabled"
               fi
 
-              printf -- '- Kernel %s | %s | LTO %s | Clang %s | SUSFS %s | BBG %s | Source %s | Metadata %s\n' \
+              printf -- '- Kernel %s | %s | LTO %s | SUSFS %s | BBG %s | Source %s | Metadata %s\n' \
                 "$kernel_version" \
                 "$manager" \
                 "$lto" \
-                "$clang_version" \
                 "$susfs_label" \
                 "$bbg_label" \
                 "$source_repo" \

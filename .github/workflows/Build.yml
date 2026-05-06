@@ -25,11 +25,6 @@ on:
         description: "Optional source git ref/branch/tag/commit"
         required: false
         default: ""
-      clang_version:
-        type: choice
-        required: true
-        options: ["default", "clang-r584948", "clang-r547379"]
-        default: "default"
       lto:
         type: choice
         required: true
@@ -141,11 +136,6 @@ jobs:
 
       - name: Sync source
         uses: ./.github/actions/sync-kernel
-
-      - name: Select Clang
-        uses: ./.github/actions/select-clang
-        with:
-          clang_version: ${{ inputs.clang_version }}
 
       - name: Replace kernel/common source
         uses: ./.github/actions/replace-common-source

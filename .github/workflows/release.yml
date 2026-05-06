@@ -209,6 +209,11 @@ jobs:
           lto: ${{ matrix.lto }}
           kernel_version: ${{ matrix.kernel_version }}
 
+      - name: Write compiler metadata
+        uses: ./.github/actions/write-compiler-metadata
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
       - name: Verify final config
         uses: ./.github/actions/verify-final-config
         with:
@@ -299,6 +304,7 @@ jobs:
             *.zip
             out/Image-*
             out/config-*
+            compiler-version.txt
             release-manifest.txt
           if-no-files-found: error
 
