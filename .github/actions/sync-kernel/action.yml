@@ -14,7 +14,7 @@ runs:
           df -h
           (
             cd "$GITHUB_WORKSPACE"
-            du -sh kernel .toolchains out 2>/dev/null || true
+            du -sh kernel kernel/.repo .toolchains out 2>/dev/null || true
           )
         }
 
@@ -23,45 +23,59 @@ runs:
         mkdir kernel
         cd kernel
 
+        echo "== repo init start: $(date -u '+%Y-%m-%dT%H:%M:%SZ') =="
+
+        init_help="$(repo init --help 2>&1 || true)"
+        init_flags=()
+
+        if grep -q -- '--depth' <<< "$init_help"; then
+          init_flags+=(--depth=1)
+        fi
+        if grep -q -- '--partial-clone' <<< "$init_help"; then
+          init_flags+=(--partial-clone)
+        fi
+        if grep -q -- '--clone-filter' <<< "$init_help"; then
+          init_flags+=(--clone-filter=blob:none)
+        fi
+
+        echo "repo init optimization flags: ${init_flags[*]:-none}"
+
         repo init \
           -u https://android.googlesource.com/kernel/manifest \
           -b "$BRANCH" \
-          --depth=1 \
-          --quiet
+          --quiet \
+          "${init_flags[@]}"
+
+        echo "== repo init end: $(date -u '+%Y-%m-%dT%H:%M:%SZ') =="
+        print_disk_usage "after repo init"
 
         sync_jobs="${SYNC_JOBS:-4}"
 
-        if [ "$BUILD_ENGINE" = "legacy" ]; then
-          if ! repo sync \
-            --no-clone-bundle \
-            --optimized-fetch \
-            -j"${sync_jobs}"
-          then
-            echo "::warning::legacy sync with optimized-fetch failed, retrying without optimized-fetch"
-            repo sync \
-              --no-clone-bundle \
-              -j"${sync_jobs}"
-          fi
+        echo "== repo sync start: $(date -u '+%Y-%m-%dT%H:%M:%SZ') =="
+        echo "repo sync jobs: $sync_jobs"
 
+        if ! repo sync \
+          -c \
+          --no-tags \
+          --no-clone-bundle \
+          --optimized-fetch \
+          -j"${sync_jobs}"
+        then
+          echo "::warning::lightweight sync with optimized-fetch failed, retrying without optimized-fetch"
+          repo sync \
+            -c \
+            --no-tags \
+            --no-clone-bundle \
+            -j"${sync_jobs}"
+        fi
+
+        echo "== repo sync end: $(date -u '+%Y-%m-%dT%H:%M:%SZ') =="
+
+        if [ "$BUILD_ENGINE" = "legacy" ]; then
           echo
           echo "== legacy clang candidates =="
           find "$GITHUB_WORKSPACE/kernel" -maxdepth 8 -type f -path '*/prebuilts-master/clang/*/bin/clang' -print 2>/dev/null | sort | head -20 || true
           find "$GITHUB_WORKSPACE/kernel" -maxdepth 8 -type f -path '*/prebuilts/clang/*/bin/clang' -print 2>/dev/null | sort | head -20 || true
-        else
-          if ! repo sync \
-            -c \
-            --no-tags \
-            --no-clone-bundle \
-            --optimized-fetch \
-            -j"${sync_jobs}"
-          then
-            echo "::warning::lightweight sync with optimized-fetch failed, retrying without optimized-fetch"
-            repo sync \
-              -c \
-              --no-tags \
-              --no-clone-bundle \
-              -j"${sync_jobs}"
-          fi
         fi
 
         print_disk_usage "after source sync"

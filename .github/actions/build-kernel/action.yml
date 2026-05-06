@@ -35,12 +35,61 @@ runs:
           echo "LLD_PARALLEL_LINK_JOBS=$LLD_PARALLEL_LINK_JOBS"
         fi
 
+        print_rust_binder_diagnostics() {
+          local label="$1"
+
+          echo
+          echo "== rust_binder diagnostics: $label =="
+          echo "module skip env:"
+          env | grep -E '^(SKIP_EXT_MODULES|SKIP_UNSTRIPPED_MODULES|SKIP_MODULES)=' || true
+
+          echo
+          echo "config refs:"
+          find ./out ./common/out \
+            -type f \
+            \( -name ".config" -o -name "*.config" -o -name "*kernel*.config" \) \
+            ! -path "./common/arch/arm64/configs/*" \
+            ! -path "./common/private.fragment" \
+            ! -path "./common/private.required" \
+            -print 2>/dev/null |
+            sort |
+            while IFS= read -r config_file; do
+              echo "-- $config_file"
+              grep -E '^(CONFIG_RUST|CONFIG_ANDROID_BINDER|CONFIG_ANDROID_BINDERFS|CONFIG_ANDROID_BINDER_RUST)=' "$config_file" || true
+            done
+
+          echo
+          echo "rust_binder outputs:"
+          find "$GITHUB_WORKSPACE/kernel/out" -name 'rust_binder.ko' -print 2>/dev/null || true
+          find out -name 'rust_binder.ko' -print 2>/dev/null || true
+
+          echo
+          echo "rust_binder expected refs:"
+          grep -R -n 'rust_binder.ko' "$GITHUB_WORKSPACE/kernel/common" "$GITHUB_WORKSPACE/kernel/build" 2>/dev/null || true
+        }
+
         if [ "$BUILD_ENGINE" = "kleaf" ]; then
+          unset SKIP_EXT_MODULES SKIP_UNSTRIPPED_MODULES SKIP_MODULES
+          echo "Kleaf build: required GKI modules are not skipped"
+
+          if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+            print_rust_binder_diagnostics "before build"
+          fi
+
+          build_status=0
           tools/bazel run \
             --lto=${{ inputs.lto }} \
             --defconfig_fragment=//common:private.fragment \
             //common:kernel_aarch64_dist -- \
-            --dist_dir=out/dist
+            --dist_dir=out/dist || build_status=$?
+
+          if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+            print_rust_binder_diagnostics "after build"
+          fi
+
+          if [ "$build_status" -ne 0 ]; then
+            exit "$build_status"
+          fi
         else
           if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
             export BUILD_CONFIG=common/build.config.coreshift.gki.aarch64

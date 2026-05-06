@@ -218,6 +218,12 @@ runs:
           add_config BBG y
         fi
 
+        if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+          add_config ANDROID_BINDER_IPC y
+          add_config ANDROID_BINDERFS y
+          add_config ANDROID_BINDER_IPC_RUST m
+        fi
+
         echo "== private.fragment =="
         cat private.fragment
 
