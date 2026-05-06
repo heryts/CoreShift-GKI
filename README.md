@@ -51,12 +51,12 @@ For your first root build, choose one manager and keep advanced features off. Co
 
 | Workflow | Purpose | Notes |
 | --- | --- | --- |
-| **Build Kernel** | Build one simpler manual kernel with stable defaults. | Uses the Google/AOSP LTS source path by default. Good first choice. |
-| **Custom Kernel Build** | Build one kernel with advanced manual options for source, Clang, and feature testing. | Stable/default source path is Google/AOSP LTS. Source override is optional. |
+| **Build Kernel** | Build one manual kernel with stable defaults. | Single-build flow. Choose Google LTS, maintained, or custom `kernel/common` source with `source_mode`. Good first choice. |
+| **Custom Kernel Build** | Build one kernel with advanced manual feature options. | Single-build flow. Choose Google LTS, maintained, or custom `kernel/common` source with `source_mode`. |
 | **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. Uses Google/AOSP LTS sources. |
-| **Build Experimental Kernel Release Matrix** | Build the curated release matrix with selectable curated Clang versions and maintained experimental `kernel/common` sources. | Experimental path. Uses maintained GitHub `kernel/common` defaults and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
+| **Build Experimental Kernel Release Matrix** | Build the curated maintained-source experimental release set. | Experimental path. Uses maintained GitHub `kernel/common` defaults and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
 
-Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for Clang testing.
+Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for maintained-source release testing.
 
 ## Quick Start
 
@@ -87,8 +87,9 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `kernel_version` | Target Android GKI family: `5.10`, `6.1`, `6.6`, or `6.12`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
-| `source_repo` | Optional replacement Git repository for `kernel/common`. Stable workflows keep the default Google GKI sync path. Experimental release uses maintained source repos by default unless you override this manually. |
-| `source_ref` | Optional branch, tag, or commit from `source_repo`. Not guaranteed stable. |
+| `source_mode` | Manual Build/Custom source choice. `google-lts` keeps the synced Google/AOSP LTS source; `maintained` uses the same maintained source mapping as the experimental release workflow; `custom` uses `source_repo`. |
+| `source_repo` | Custom replacement Git repository for `kernel/common`, used only when `source_mode=custom`. |
+| `source_ref` | Optional branch, tag, or commit for maintained/custom source replacement. Not guaranteed stable. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
 | `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. Compatibility depends on the selected manager and the exact `kernel/common` source tree. |
 | `baseband_guard` | Baseband Guard support. Advanced protection feature. |
@@ -99,7 +100,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `legacy_kmi_check` | Controls the legacy 5.10 KMI check behavior. |
 | `publish_mode` | Chooses release output, artifact output, or both. |
 
-Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated on Google/AOSP LTS sources. Experimental release matrix builds use maintained default source repos, and optional source override.
+Some workflows intentionally hide low-level fragment toggles to keep normal builds simpler and safer. Stable release matrix builds stay fixed and curated on Google/AOSP LTS sources. Experimental release matrix builds use maintained default source repos and optional source override.
 
 ### Release Matrix Files
 
@@ -108,9 +109,19 @@ Some workflows intentionally hide low-level fragment toggles to keep normal buil
 - `.github/matrix/release.json` contains only curated Google/AOSP-supported stable release variants.
 - `.github/matrix/release_exp.json` contains curated maintained-source experimental variants, including validated `6.12` SUSFS variants.
 
-### Experimental Source Defaults
+### Source Modes
 
-The experimental release workflow uses these maintained `kernel/common` repos by default unless you set `source_repo` yourself:
+Manual **Build Kernel** and **Custom Kernel Build** are single-build flows, not matrices. They support these source modes:
+
+- `google-lts`: keep the Google/AOSP LTS source synced by the Android kernel manifest. No `kernel/common` replacement is performed, and expected-Clang materialization is skipped.
+- `maintained`: replace `kernel/common` with the maintained source repo for the selected kernel family, using the same mapping as the experimental release workflow. Expected-Clang materialization runs after replacement.
+- `custom`: replace `kernel/common` with `source_repo` and optional `source_ref`. `source_repo` is required. Expected-Clang materialization runs after replacement.
+
+Maintained and custom source modes are experimental. They can fail build, KMI, KCFI, module loading, Wi-Fi, root manager integration, or boot even when the Google LTS source path works.
+
+### Maintained Source Defaults
+
+The manual `source_mode=maintained` flow and the experimental release workflow use these maintained `kernel/common` repos by default:
 
 - `5.10`: `https://github.com/ramabondanp/android_kernel_common-5.10`
 - `6.1`: `https://github.com/ramabondanp/android_kernel_common-6.1`
@@ -121,11 +132,11 @@ These are experimental defaults, not stable release defaults.
 
 ### Source Policy
 
-- Stable workflows use the Google/AOSP LTS source path by default:
+- Single-build manual workflows can choose Google LTS, maintained, or custom source modes:
   - `Build Kernel`
   - `Custom Kernel Build`
-  - `Build Kernel Release Matrix`
-- Experimental release uses maintained GitHub `kernel/common` defaults, with optional `source_repo` / `source_ref` override.
+- Stable release matrix uses Google/AOSP LTS sources from `.github/matrix/release.json`.
+- Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json`, with optional `source_repo` / `source_ref` override.
 - The stable release matrix file excludes unsupported stable-only combinations such as the current `6.12` SUSFS release variants.
 
 ### SUSFS Note

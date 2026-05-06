@@ -17,8 +17,13 @@ on:
         description: "Optional manager git ref/commit/tag"
         required: false
         default: ""
+      source_mode:
+        type: choice
+        required: true
+        options: ["google-lts", "maintained", "custom"]
+        default: "google-lts"
       source_repo:
-        description: "Optional git repo URL to replace kernel/common"
+        description: "Custom kernel/common repo URL, used only when source_mode=custom"
         required: false
         default: ""
       source_ref:
@@ -83,8 +88,13 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ inputs.kernel_version }}" = "6.12" ] && [ "${{ inputs.susfs }}" = "on" ] && [ -z "${{ inputs.source_repo }}" ]; then
-            echo "::error::6.12 SUSFS is currently validated only on the maintained-source path. Use the experimental workflow or set source_repo/source_ref to a compatible 6.12 source tree."
+          if [ "${{ inputs.source_mode }}" = "custom" ] && [ -z "${{ inputs.source_repo }}" ]; then
+            echo "::error::source_repo is required when source_mode=custom"
+            exit 1
+          fi
+
+          if [ "${{ inputs.kernel_version }}" = "6.12" ] && [ "${{ inputs.susfs }}" = "on" ] && [ "${{ inputs.source_mode }}" = "google-lts" ]; then
+            echo "::error::6.12 SUSFS is currently validated only on maintained/custom source paths. Select source_mode=maintained or source_mode=custom with a compatible source tree."
             exit 1
           fi
 
@@ -137,15 +147,70 @@ jobs:
       - name: Sync source
         uses: ./.github/actions/sync-kernel
 
+      - name: Resolve source repo
+        id: source-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          effective_source_repo=""
+          effective_source_ref="${{ inputs.source_ref }}"
+
+          case "${{ inputs.source_mode }}" in
+            google-lts)
+              effective_source_ref=""
+              ;;
+            maintained)
+              case "${{ inputs.kernel_version }}" in
+                5.10)
+                  effective_source_repo="https://github.com/ramabondanp/android_kernel_common-5.10"
+                  ;;
+                6.1)
+                  effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.1"
+                  ;;
+                6.6)
+                  effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.6"
+                  ;;
+                6.12)
+                  effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.12"
+                  ;;
+                *)
+                  echo "::error::No maintained source repo for kernel_version=${{ inputs.kernel_version }}"
+                  exit 1
+                  ;;
+              esac
+              ;;
+            custom)
+              effective_source_repo="${{ inputs.source_repo }}"
+              ;;
+            *)
+              echo "::error::unsupported source_mode=${{ inputs.source_mode }}"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "source_repo=$effective_source_repo"
+            echo "source_ref=$effective_source_ref"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Replace kernel/common source
+        if: inputs.source_mode != 'google-lts'
         uses: ./.github/actions/replace-common-source
         with:
-          source_repo: ${{ inputs.source_repo }}
-          source_ref: ${{ inputs.source_ref }}
+          source_repo: ${{ steps.source-repo.outputs.source_repo }}
+          source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
       - name: Fix stale KernelSU Kconfig include
         if: inputs.kernel_version == '6.12'
         uses: ./.github/actions/fix-stale-kernelsu-kconfig
+
+      - name: Ensure expected Clang
+        if: inputs.source_mode != 'google-lts'
+        uses: ./.github/actions/ensure-expected-clang
+        with:
+          enabled: "true"
+          kernel_version: ${{ inputs.kernel_version }}
 
       - name: Init manager
         if: inputs.manager != 'Vanilla'
