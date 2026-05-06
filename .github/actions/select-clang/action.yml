@@ -13,7 +13,7 @@ runs:
       run: |
         set -euo pipefail
 
-        CHOICE="${{ inputs.clang_version }}"
+        CLANG_VERSION="${{ inputs.clang_version }}"
         KERNEL_DIR="${GITHUB_WORKSPACE}/kernel"
         TOOLCHAIN_BASE="${GITHUB_WORKSPACE}/.toolchains"
         AOSP_CLANG_DIR="${TOOLCHAIN_BASE}/aosp-clang"
@@ -23,13 +23,18 @@ runs:
         SEARCHED_ROOTS=""
         FOUND_CANDIDATES=""
 
-        mkdir -p "$TOOLCHAIN_BASE"
-
         activate_clang_bin_dir() {
           local bin_dir="$1"
 
           echo "$bin_dir" >> "$GITHUB_PATH"
           export PATH="$bin_dir:$PATH"
+        }
+
+        assert_non_default_override() {
+          if [ "$CLANG_VERSION" = "default" ]; then
+            echo "::error::internal bug: destructive clang override reached with default selection"
+            exit 1
+          fi
         }
 
         print_success_summary() {
@@ -38,7 +43,7 @@ runs:
           local version_line="$3"
 
           echo "build engine: ${BUILD_ENGINE:-unknown}"
-          echo "selected clang: $CHOICE"
+          echo "selected clang: $CLANG_VERSION"
           echo "clang root: ${CLANG_ROOT:-<none>}"
           echo "override mode: $mode"
           echo "updated clang dirs: $linked_count"
@@ -136,7 +141,9 @@ runs:
 
           while IFS= read -r entry; do
             [ -n "$entry" ] || continue
+            assert_non_default_override
             rm -rf "$entry"
+            assert_non_default_override
             ln -s "$selected_dir" "$entry"
             linked_count=$((linked_count + 1))
           done < <(
@@ -159,10 +166,12 @@ runs:
             [ -n "$entry" ] || continue
 
             if [ -L "$entry" ]; then
+              assert_non_default_override
               rm -f "$entry"
               mkdir -p "$entry"
             fi
 
+            assert_non_default_override
             rsync -a --delete \
               --exclude=BUILD \
               --exclude=BUILD.bazel \
@@ -218,7 +227,9 @@ runs:
             fi
           } >> "$COMPILER_INFO"
 
-          cp "$COMPILER_INFO" "$LOG_FILE"
+          if [ -d "$TOOLCHAIN_BASE" ]; then
+            cp "$COMPILER_INFO" "$LOG_FILE"
+          fi
         }
 
         DETECTED_PATHS=()
@@ -240,34 +251,49 @@ runs:
 
         CLANG_OVERRIDE_MODE="default"
 
-        if [ "$CHOICE" = "default" ]; then
+        if [ "$CLANG_VERSION" = "default" ]; then
+          SELECTED_BIN_DIR=""
           if [ -n "$TARGET_CLANG_DIR" ]; then
             CLANG_BIN="$TARGET_CLANG_DIR/bin/clang"
             LLD_BIN="$TARGET_CLANG_DIR/bin/ld.lld"
-            SELECTED_BIN_DIR="$TARGET_CLANG_DIR/bin"
 
-            if [ ! -x "$CLANG_BIN" ] || [ ! -x "$LLD_BIN" ]; then
-              echo "::error::Detected synced Clang directory is missing expected binaries under $TARGET_CLANG_DIR"
-              exit 1
+            if [ -x "$CLANG_BIN" ]; then
+              SELECTED_BIN_DIR="$TARGET_CLANG_DIR/bin"
+            else
+              CLANG_BIN=""
             fi
 
-            activate_clang_bin_dir "$SELECTED_BIN_DIR"
+            if [ ! -x "$LLD_BIN" ]; then
+              LLD_BIN=""
+            fi
+
             echo "== default synced Clang =="
             echo "target_dir=$TARGET_CLANG_DIR"
           else
             CLANG_BIN="$(command -v clang || true)"
             LLD_BIN="$(command -v ld.lld || true)"
+          fi
 
-            if [ -z "$CLANG_BIN" ]; then
-              echo "::error::No repo-synced clang found and clang is not available in PATH"
-              exit 1
-            fi
-
-            echo "== default PATH Clang =="
-            echo "target_dir=<none>"
+          if [ -z "$CLANG_BIN" ]; then
+            CLANG_BIN="$(command -v clang || true)"
+          fi
+          if [ -z "$LLD_BIN" ]; then
+            LLD_BIN="$(command -v ld.lld || true)"
+          fi
+          if [ -z "$SELECTED_BIN_DIR" ] && [ -n "$CLANG_BIN" ]; then
             SELECTED_BIN_DIR="$(dirname "$CLANG_BIN")"
           fi
-          CLANG_VERSION_LINE="$(clang --version | head -n 1 || echo not found)"
+
+          if [ -z "$TARGET_CLANG_DIR" ]; then
+            echo "== default PATH Clang =="
+            echo "target_dir=<none>"
+          fi
+
+          if [ -n "$CLANG_BIN" ] && [ -x "$CLANG_BIN" ]; then
+            CLANG_VERSION_LINE="$("$CLANG_BIN" --version | head -n 1 || echo not found)"
+          else
+            CLANG_VERSION_LINE="not found"
+          fi
           print_success_summary "$CLANG_OVERRIDE_MODE" "0" "$CLANG_VERSION_LINE"
 
           {
@@ -285,17 +311,21 @@ runs:
           exit 0
         fi
 
+        mkdir -p "$TOOLCHAIN_BASE"
+
         if [ -z "$TARGET_CLANG_DIR" ]; then
           print_failure_debug
           echo "::error::This branch/build path does not expose a repo-synced Clang directory under $GITHUB_WORKSPACE/kernel, so symlink override is unavailable."
           exit 1
         fi
 
+        assert_non_default_override
         rm -rf "$AOSP_CLANG_DIR"
+        assert_non_default_override
         git clone --depth=1 --filter=blob:none --sparse "$AOSP_CLANG_URL" "$AOSP_CLANG_DIR"
-        git -C "$AOSP_CLANG_DIR" sparse-checkout set --cone "$CHOICE"
+        git -C "$AOSP_CLANG_DIR" sparse-checkout set --cone "$CLANG_VERSION"
 
-        SELECTED_CLANG_DIR="$AOSP_CLANG_DIR/$CHOICE"
+        SELECTED_CLANG_DIR="$AOSP_CLANG_DIR/$CLANG_VERSION"
         CLANG_BIN="$SELECTED_CLANG_DIR/bin/clang"
         LLD_BIN="$SELECTED_CLANG_DIR/bin/ld.lld"
         SELECTED_BIN_DIR="$SELECTED_CLANG_DIR/bin"
@@ -337,7 +367,7 @@ runs:
         print_success_summary "$CLANG_OVERRIDE_MODE" "$UPDATED_COUNT" "$CLANG_VERSION_LINE"
 
         {
-          echo "CLANG_SELECTION=$CHOICE"
+          echo "CLANG_SELECTION=$CLANG_VERSION"
           echo "CLANG_OVERRIDE_ROOT=$CLANG_ROOT"
           echo "CLANG_OVERRIDE_TARGET=$TARGET_CLANG_DIR"
           echo "CLANG_OVERRIDE_TARGET_NAME=$TARGET_CLANG_NAME"
@@ -347,4 +377,4 @@ runs:
           echo "CLANG_BACKUP_DIR="
         } >> "$GITHUB_ENV"
 
-        write_metadata "$CHOICE" "$CLANG_ROOT" "$SELECTED_CLANG_DIR" "$TARGET_CLANG_DIR" "$CLANG_OVERRIDE_MODE" "$UPDATED_COUNT" "$SELECTED_BIN_DIR/clang" "$SELECTED_BIN_DIR/ld.lld"
+        write_metadata "$CLANG_VERSION" "$CLANG_ROOT" "$SELECTED_CLANG_DIR" "$TARGET_CLANG_DIR" "$CLANG_OVERRIDE_MODE" "$UPDATED_COUNT" "$SELECTED_BIN_DIR/clang" "$SELECTED_BIN_DIR/ld.lld"
