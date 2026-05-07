@@ -78,12 +78,28 @@ runs:
           )
 
           if [ "${{ inputs.kmi_bypass }}" = "on" ]; then
-            if [ "${{ inputs.source_mode }}" = "google-lts" ]; then
-              echo "::warning::Ignoring kmi_bypass=on for google-lts; strict KMI remains enabled"
-            else
+            case "${{ inputs.source_mode }}" in
+              maintained|custom)
               echo "Kleaf KMI symbol-list strict mode bypass enabled for source_mode=${{ inputs.source_mode }}"
               bazel_args+=("--nokmi_symbol_list_strict_mode")
+                ;;
+              *)
+                echo "::warning::Ignoring kmi_bypass=on for source_mode=${{ inputs.source_mode }}; strict KMI remains enabled"
+                ;;
+            esac
+          fi
+
+          if [ "${{ inputs.source_mode }}" = "pixel" ]; then
+            echo "== Pixel Bazel target check =="
+            if ! tools/bazel query //common:kernel_aarch64_dist >/tmp/coreshift-pixel-target.txt 2>/tmp/coreshift-pixel-target.err; then
+              echo "::error::Pixel source branch does not expose //common:kernel_aarch64_dist. Pixel branches may require a device-specific Kleaf target."
+              echo "== bazel query error =="
+              cat /tmp/coreshift-pixel-target.err || true
+              echo "== //common targets =="
+              tools/bazel query '//common:*' 2>/dev/null | sort || true
+              exit 1
             fi
+            cat /tmp/coreshift-pixel-target.txt
           fi
 
           build_status=0

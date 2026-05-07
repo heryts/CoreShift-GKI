@@ -52,12 +52,12 @@ For your first root build, choose one manager and keep advanced features off. Co
 
 | Workflow | Purpose | Notes |
 | --- | --- | --- |
-| **Build Kernel** | Build one manual kernel with stable defaults. | Single-build flow. Choose Google LTS, maintained, or custom `kernel/common` source with `source_mode`. Good first choice. |
-| **Custom Kernel Build** | Build one kernel with advanced manual feature options. | Single-build flow. Choose Google LTS, maintained, or custom `kernel/common` source with `source_mode`. |
+| **Build Kernel** | Build one manual kernel with stable defaults. | Single-build flow. Choose Google LTS, maintained, Pixel, or custom source with `source_mode`. Good first choice. |
+| **Custom Kernel Build** | Build one kernel with advanced manual feature options. | Single-build flow. Choose Google LTS, maintained, Pixel, or custom source with `source_mode`. |
 | **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. Uses Google/AOSP LTS sources. |
-| **Build Experimental Kernel Release Matrix** | Build the curated maintained-source experimental release set. | Experimental path. Uses maintained GitHub `kernel/common` defaults and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
+| **Build Experimental Kernel Release Matrix** | Build curated maintained-source or Pixel experimental release sets. | Experimental path. Uses maintained GitHub `kernel/common` defaults or official Pixel manifests and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
 
-Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for maintained-source release testing.
+Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for maintained-source or Pixel release testing.
 
 ## Quick Start
 
@@ -88,7 +88,8 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `kernel_version` | Target Android GKI family: `5.10`, `6.1`, or `6.6`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
-| `source_mode` | Manual Build/Custom source choice. `google-lts` keeps the synced Google/AOSP LTS source; `maintained` uses the same maintained source mapping as the experimental release workflow; `custom` uses `source_repo`. |
+| `source_mode` | Manual Build/Custom source choice. `google-lts` keeps the synced Google/AOSP LTS source; `maintained` uses the same maintained source mapping as the experimental release workflow; `pixel` uses an official Google Pixel kernel manifest branch; `custom` uses `source_repo`. |
+| `pixel_branch` | Official Pixel kernel manifest branch used only when `source_mode=pixel`. Pixel mode is experimental and Pixel 6+ specific. |
 | `source_repo` | Custom replacement Git repository for `kernel/common`, used only when `source_mode=custom`. |
 | `source_ref` | Optional branch, tag, or commit for maintained/custom source replacement. Not guaranteed stable. |
 | `kmi_bypass` | Experimental maintained/custom source workaround. Defaults to `off`; when set to `on`, bypasses strict Kleaf KMI symbol-list checks for incompatible replacement sources only. |
@@ -107,9 +108,10 @@ Some workflows intentionally hide low-level fragment toggles to keep normal buil
 ### Release Matrix Files
 
 - Stable release matrix workflow reads `.github/matrix/release.json`.
-- Experimental release matrix workflow reads `.github/matrix/release_exp.json`.
+- Experimental release matrix workflow reads `.github/matrix/release_exp.json` for maintained/custom profiles and `.github/matrix/release_pixel.json` for Pixel profiles.
 - `.github/matrix/release.json` contains only curated Google/AOSP-supported stable release variants.
 - `.github/matrix/release_exp.json` contains curated maintained-source experimental variants.
+- `.github/matrix/release_pixel.json` contains curated official Pixel-manifest experimental variants.
 
 ### Source Modes
 
@@ -117,9 +119,10 @@ Manual **Build Kernel** and **Custom Kernel Build** are single-build flows, not 
 
 - `google-lts`: keep the Google/AOSP LTS source synced by the Android kernel manifest. No `kernel/common` replacement is performed, and expected-Clang materialization is skipped.
 - `maintained`: replace `kernel/common` with the maintained source repo for the selected kernel family, using the same mapping as the experimental release workflow. Expected-Clang materialization runs after replacement.
+- `pixel`: sync an official Google Pixel kernel manifest branch selected by `pixel_branch`. No maintained GitHub source replacement is performed. This mode is experimental, Pixel 6+ only, and not generic GKI LTS.
 - `custom`: replace `kernel/common` with `source_repo` and optional `source_ref`. `source_repo` is required. Expected-Clang materialization runs after replacement.
 
-Maintained and custom source modes are experimental. They can fail build, KMI, KCFI, module loading, Wi-Fi, root manager integration, or boot even when the Google LTS source path works.
+Maintained, Pixel, and custom source modes are experimental. They can fail build, KMI, KCFI, module loading, Wi-Fi, root manager integration, or boot even when the Google LTS source path works. Pixel source builds may require Pixel-specific modules, images, and targets, and are not guaranteed to work on non-Pixel devices.
 
 Google LTS, maintained, custom, stable release, and experimental release builds keep strict KMI symbol-list checking enabled by default. The `kmi_bypass` input is an explicit experimental workaround for testing incompatible maintained/custom replacement sources; it is off by default and is ignored for Google LTS. Enabling it can break vendor modules, Wi-Fi, modem, display, touch, audio, or boot, so use it only while testing source trees that cannot currently satisfy Google's symbol list.
 
@@ -133,13 +136,24 @@ The manual `source_mode=maintained` flow and the experimental release workflow u
 
 These are experimental defaults, not stable release defaults.
 
+### Pixel Source Defaults
+
+The manual `source_mode=pixel` flow and the experimental `source_profile=pixel` matrix use official Google Pixel kernel manifest branches:
+
+- `android14-gs-pixel-6.1`
+- `android-gs-raviole-6.1-android16`
+- `android-gs-bluejay-6.1-android16`
+- `android-gs-akita-6.1-android16`
+
+Pixel source mode is experimental, Pixel 6+ specific, and not generic GKI LTS. It may need Pixel-specific modules or images and can fail on non-Pixel devices. If a Pixel branch does not expose `//common:kernel_aarch64_dist`, the build reports that target mismatch instead of pretending the generic GKI target is valid.
+
 ### Source Policy
 
-- Single-build manual workflows can choose Google LTS, maintained, or custom source modes:
+- Single-build manual workflows can choose Google LTS, maintained, Pixel, or custom source modes:
   - `Build Kernel`
   - `Custom Kernel Build`
 - Stable release matrix uses Google/AOSP LTS sources from `.github/matrix/release.json`.
-- Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json`, with optional `source_repo` / `source_ref` override.
+- Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json` or official Pixel manifests from `.github/matrix/release_pixel.json`. Custom experimental release runs reuse the maintained matrix shape with explicit `source_repo` / `source_ref`.
 
 ### SUSFS Note
 

@@ -4,7 +4,7 @@ inputs:
   source_mode:
     required: false
     default: "google-lts"
-    description: Select official or maintained/custom minimal sync path.
+    description: Select official, Pixel, or maintained/custom minimal sync path.
 runs:
   using: composite
   steps:
@@ -69,7 +69,7 @@ runs:
         official_project_count="${official_project_count:-0}"
 
         case "$source_mode" in
-          google-lts)
+          google-lts|pixel)
             ;;
           maintained|custom)
             local_manifest_src="$GITHUB_WORKSPACE/.github/manifests/minimal/${BRANCH}.xml"

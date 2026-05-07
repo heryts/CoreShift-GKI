@@ -8,8 +8,13 @@ on:
         required: true
         options: ["all", "5.10", "6.1", "6.6"]
         default: "all"
+      source_profile:
+        type: choice
+        required: true
+        options: ["maintained", "pixel", "custom"]
+        default: "maintained"
       source_repo:
-        description: "Optional git repo URL to replace kernel/common"
+        description: "Optional git repo URL to replace kernel/common; required when source_profile=custom"
         required: false
         default: ""
       source_ref:
@@ -40,9 +45,33 @@ jobs:
         run: |
           set -euo pipefail
 
+          source_profile="${{ inputs.source_profile }}"
+
+          case "$source_profile" in
+            maintained|custom)
+              matrix_path=".github/matrix/release_exp.json"
+              ;;
+            pixel)
+              matrix_path=".github/matrix/release_pixel.json"
+              ;;
+            *)
+              echo "::error::unsupported source_profile=$source_profile"
+              exit 1
+              ;;
+          esac
+
+          if [ "$source_profile" = "custom" ] && [ -z "${{ inputs.source_repo }}" ]; then
+            echo "::error::source_repo is required when source_profile=custom"
+            exit 1
+          fi
+
+          export SOURCE_PROFILE="$source_profile"
+          export MATRIX_PATH="$matrix_path"
+
           matrix="$(
             python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           required = {
@@ -64,7 +93,13 @@ jobs:
               "legacy_kmi_check",
           }
 
-          matrix = json.loads(Path(".github/matrix/release_exp.json").read_text())
+          source_profile = os.environ["SOURCE_PROFILE"]
+          matrix_path = Path(os.environ["MATRIX_PATH"])
+
+          if source_profile == "pixel":
+              required.add("source_branch")
+
+          matrix = json.loads(matrix_path.read_text())
           include = matrix.get("include")
 
           if not isinstance(include, list) or not include:
@@ -146,6 +181,16 @@ jobs:
         with:
           kernel_version: ${{ matrix.kernel_version }}
 
+      - name: Select Pixel manifest branch
+        if: inputs.source_profile == 'pixel'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "BRANCH=${{ matrix.source_branch }}" >> "$GITHUB_ENV"
+          echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
+          echo "Pixel source profile selected: official Google Pixel manifest branch ${{ matrix.source_branch }}"
+
       - name: Install host tools
         uses: ./.github/actions/install-host-tools
         with:
@@ -157,7 +202,7 @@ jobs:
       - name: Sync source
         uses: ./.github/actions/sync-kernel
         with:
-          source_mode: maintained
+          source_mode: ${{ inputs.source_profile }}
 
       - name: Resolve experimental source repo
         id: source-repo
@@ -168,7 +213,10 @@ jobs:
           effective_source_repo="${{ inputs.source_repo }}"
           effective_source_ref="${{ inputs.source_ref }}"
 
-          if [ -z "$effective_source_repo" ]; then
+          if [ "${{ inputs.source_profile }}" = "pixel" ]; then
+            effective_source_repo=""
+            effective_source_ref=""
+          elif [ -z "$effective_source_repo" ]; then
             case "${{ matrix.kernel_version }}" in
               5.10)
                 effective_source_repo="https://github.com/ramabondanp/android_kernel_common-5.10"
@@ -192,23 +240,27 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Replace kernel/common source
+        if: inputs.source_profile == 'maintained' || inputs.source_profile == 'custom'
         uses: ./.github/actions/replace-common-source
         with:
           source_repo: ${{ steps.source-repo.outputs.source_repo }}
           source_ref: ${{ steps.source-repo.outputs.source_ref }}
 
       - name: Clean bundled KernelSU staging leftovers
+        if: inputs.source_profile == 'maintained' || inputs.source_profile == 'custom'
         uses: ./.github/actions/fix-stale-kernelsu-kconfig
         with:
           remove_bundled_staging: "true"
 
       - name: Apply source fixes
+        if: inputs.source_profile == 'maintained' || inputs.source_profile == 'custom'
         uses: ./.github/actions/apply-source-fixes
         with:
           kernel_version: ${{ matrix.kernel_version }}
-          source_mode: maintained
+          source_mode: ${{ inputs.source_profile }}
 
       - name: Ensure expected Clang
+        if: inputs.source_profile == 'maintained' || inputs.source_profile == 'custom'
         uses: ./.github/actions/ensure-expected-clang
         with:
           enabled: "true"
@@ -293,7 +345,7 @@ jobs:
         with:
           lto: ${{ matrix.lto }}
           kernel_version: ${{ matrix.kernel_version }}
-          source_mode: maintained
+          source_mode: ${{ inputs.source_profile }}
           kmi_bypass: ${{ inputs.kmi_bypass }}
 
       - name: Write compiler metadata
@@ -377,6 +429,8 @@ jobs:
             echo "manager=${{ matrix.manager }}"
             echo "susfs=${{ matrix.susfs }}"
             echo "lto=${{ matrix.lto }}"
+            echo "source_profile=${{ inputs.source_profile }}"
+            echo "source_branch=${{ matrix.source_branch }}"
             echo "source_repo=${{ steps.source-repo.outputs.source_repo }}"
             echo "source_ref=${{ steps.source-repo.outputs.source_ref }}"
             echo "ikconfig=${{ matrix.ikconfig }}"
@@ -448,6 +502,7 @@ jobs:
             echo
             echo "Stable release workflow remains the recommended path."
             echo "Experimental prerelease. Maintained/custom source builds may break KMI/KCFI, vendor modules, Wi-Fi, modem, display, root, or boot."
+            echo "Pixel source builds use official Google Pixel manifests, are Pixel 6+ specific, and are not generic GKI LTS outputs."
             echo
             echo "- Date: $date"
             echo "- Run: $GITHUB_RUN_NUMBER"
@@ -460,7 +515,16 @@ jobs:
               susfs="$(sed -n 's/^susfs=//p' "$manifest")"
               lto="$(sed -n 's/^lto=//p' "$manifest")"
               baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
+              source_profile="$(sed -n 's/^source_profile=//p' "$manifest")"
+              source_branch="$(sed -n 's/^source_branch=//p' "$manifest")"
               source_repo="$(sed -n 's/^source_repo=//p' "$manifest")"
+              source_label="$source_repo"
+
+              if [ "$source_profile" = "pixel" ]; then
+                source_label="pixel:${source_branch}"
+              elif [ -z "$source_label" ]; then
+                source_label="$source_profile"
+              fi
 
               susfs_label="Disabled"
               if [ "$susfs" = "on" ]; then
@@ -478,7 +542,7 @@ jobs:
                 "$lto" \
                 "$susfs_label" \
                 "$bbg_label" \
-                "$source_repo"
+                "$source_label"
             done < <(find release-artifacts -type f -name release-manifest.txt | sort)
 
             echo
