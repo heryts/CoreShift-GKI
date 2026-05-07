@@ -147,6 +147,12 @@ The manual `source_mode=pixel` flow and the experimental `source_profile=pixel` 
 
 Pixel source mode is experimental, Pixel 6+ specific, and not generic GKI LTS. It may need Pixel-specific modules or images and can fail on non-Pixel devices. If a Pixel branch does not expose `//common:kernel_aarch64_dist`, the build reports that target mismatch instead of pretending the generic GKI target is valid.
 
+The Pixel experimental release matrix is Vanilla-only until each manager and
+feature combination is validated per Pixel branch. SUSFS patch application has
+been checked only for `android14-gs-pixel-6.1` with `KernelSU` and `KowSU`;
+other Pixel branches and Pixel release-matrix SUSFS variants are not advertised
+as supported yet.
+
 ### Source Policy
 
 - Single-build manual workflows can choose Google LTS, maintained, Pixel, or custom source modes:
