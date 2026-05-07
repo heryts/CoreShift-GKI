@@ -90,6 +90,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 | `source_mode` | Manual Build/Custom source choice. `google-lts` keeps the synced Google/AOSP LTS source; `maintained` uses the same maintained source mapping as the experimental release workflow; `custom` uses `source_repo`. |
 | `source_repo` | Custom replacement Git repository for `kernel/common`, used only when `source_mode=custom`. |
 | `source_ref` | Optional branch, tag, or commit for maintained/custom source replacement. Not guaranteed stable. |
+| `kmi_bypass` | Experimental maintained/custom source workaround. Defaults to `off`; when set to `on`, bypasses strict Kleaf KMI symbol-list checks for incompatible replacement sources only. |
 | `lto` | Link-time optimization. `thin` is the safest default. |
 | `susfs` | SUSFS4KSU support. Advanced root-hiding/spoofing feature. Compatibility depends on the selected manager and the exact `kernel/common` source tree. |
 | `baseband_guard` | Baseband Guard support. Advanced protection feature. |
@@ -119,7 +120,7 @@ Manual **Build Kernel** and **Custom Kernel Build** are single-build flows, not 
 
 Maintained and custom source modes are experimental. They can fail build, KMI, KCFI, module loading, Wi-Fi, root manager integration, or boot even when the Google LTS source path works.
 
-Google LTS builds keep strict KMI symbol-list checking enabled. Maintained and custom experimental builds may relax Kleaf KMI strict mode because those replacement source trees can differ from Google's published GKI symbol list, for example when a source tree no longer exports symbols that Google's list still requires. This avoids failing solely on source/list mismatches, but it can reduce vendor module compatibility: experimental builds may still break Wi-Fi, vendor modules, root integration, or boot.
+Google LTS, maintained, custom, stable release, and experimental release builds keep strict KMI symbol-list checking enabled by default. The `kmi_bypass` input is an explicit experimental workaround for testing incompatible maintained/custom replacement sources; it is off by default and is ignored for Google LTS. Enabling it can break vendor modules, Wi-Fi, modem, display, touch, audio, or boot, so use it only while testing source trees that cannot currently satisfy Google's symbol list.
 
 ### Maintained Source Defaults
 

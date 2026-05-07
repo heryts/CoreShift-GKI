@@ -16,6 +16,12 @@ on:
         description: "Optional source git ref/branch/tag/commit"
         required: false
         default: ""
+      kmi_bypass:
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
+        description: "Experimental: bypass strict KMI symbol-list checks for incompatible custom/maintained sources"
 
 jobs:
   prepare-matrix:
@@ -291,7 +297,7 @@ jobs:
           lto: ${{ matrix.lto }}
           kernel_version: ${{ matrix.kernel_version }}
           source_mode: maintained
-          kmi_strict: "off"
+          kmi_bypass: ${{ inputs.kmi_bypass }}
 
       - name: Write compiler metadata
         uses: ./.github/actions/write-compiler-metadata

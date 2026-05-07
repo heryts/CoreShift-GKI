@@ -11,10 +11,10 @@ inputs:
     required: false
     default: "google-lts"
     description: Source mode used by the workflow.
-  kmi_strict:
+  kmi_bypass:
     required: false
-    default: "on"
-    description: Keep Kleaf KMI symbol-list strict mode enabled.
+    default: "off"
+    description: Experimental opt-in bypass for Kleaf KMI symbol-list strict mode.
 runs:
   using: composite
   steps:
@@ -36,7 +36,7 @@ runs:
         echo "BUILD_ENGINE=$BUILD_ENGINE"
         echo "KERNEL_VERSION=${{ inputs.kernel_version }}"
         echo "SOURCE_MODE=${{ inputs.source_mode }}"
-        echo "KMI_STRICT=${{ inputs.kmi_strict }}"
+        echo "KMI_BYPASS=${{ inputs.kmi_bypass }}"
         echo "LTO=${{ inputs.lto }}"
         echo "JOBS=$JOBS"
         echo "MAKEFLAGS=$MAKEFLAGS"
@@ -77,9 +77,13 @@ runs:
             "--defconfig_fragment=//common:private.fragment"
           )
 
-          if [ "${{ inputs.kmi_strict }}" != "on" ]; then
-            echo "Kleaf KMI symbol-list strict mode disabled for source_mode=${{ inputs.source_mode }}"
-            bazel_args+=("--nokmi_symbol_list_strict_mode")
+          if [ "${{ inputs.kmi_bypass }}" = "on" ]; then
+            if [ "${{ inputs.source_mode }}" = "google-lts" ]; then
+              echo "::warning::Ignoring kmi_bypass=on for google-lts; strict KMI remains enabled"
+            else
+              echo "Kleaf KMI symbol-list strict mode bypass enabled for source_mode=${{ inputs.source_mode }}"
+              bazel_args+=("--nokmi_symbol_list_strict_mode")
+            fi
           fi
 
           build_status=0
