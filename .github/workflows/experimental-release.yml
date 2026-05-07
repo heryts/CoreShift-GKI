@@ -433,7 +433,7 @@ jobs:
 
           mkdir -p "$release_dir"
 
-          find release-artifacts -type f \( -name '*.zip' -o -name 'compiler-version-*.txt' \) -print0 |
+          find release-artifacts -type f -name '*.zip' -print0 |
             while IFS= read -r -d '' file; do
               cp "$file" "$release_dir/$(basename "$file")"
             done
@@ -447,7 +447,7 @@ jobs:
             echo "CoreShift GKI experimental release"
             echo
             echo "Stable release workflow remains the recommended path."
-            echo "Experimental maintained-source builds may break boot, Wi-Fi, modules, root, or KMI compatibility."
+            echo "Experimental prerelease. Maintained/custom source builds may break KMI/KCFI, vendor modules, Wi-Fi, modem, display, root, or boot."
             echo
             echo "- Date: $date"
             echo "- Run: $GITHUB_RUN_NUMBER"
@@ -461,7 +461,6 @@ jobs:
               lto="$(sed -n 's/^lto=//p' "$manifest")"
               baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
               source_repo="$(sed -n 's/^source_repo=//p' "$manifest")"
-              compiler_metadata="$(sed -n 's/^compiler_metadata=//p' "$manifest")"
 
               susfs_label="Disabled"
               if [ "$susfs" = "on" ]; then
@@ -473,20 +472,17 @@ jobs:
                 bbg_label="Enabled"
               fi
 
-              printf -- '- Kernel %s | %s | LTO %s | SUSFS %s | BBG %s | Source %s | Metadata %s\n' \
+              printf -- '- Kernel %s | %s | LTO %s | SUSFS %s | BBG %s | Source %s\n' \
                 "$kernel_version" \
                 "$manager" \
                 "$lto" \
                 "$susfs_label" \
                 "$bbg_label" \
-                "$source_repo" \
-                "$compiler_metadata"
+                "$source_repo"
             done < <(find release-artifacts -type f -name release-manifest.txt | sort)
 
             echo
-            echo "Compiler metadata files are attached as release assets."
-            echo "After boot, compare them with uname -a or cat /proc/version."
-            echo "Extra files are also available in workflow artifacts."
+            echo "Configs, raw images, compiler metadata, and manifests are available in workflow artifacts, not release assets."
           } > "$body"
 
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
@@ -503,5 +499,6 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_TAG }}
-          files: release-zips/*
+          files: release-zips/*.zip
           body_path: ${{ env.RELEASE_BODY }}
+          prerelease: true

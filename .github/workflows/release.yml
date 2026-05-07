@@ -378,7 +378,7 @@ jobs:
             done < <(find release-artifacts -type f -name release-manifest.txt | sort)
 
             echo
-            echo "Extra files are available in workflow artifacts."
+            echo "Configs, raw images, compiler metadata, and manifests are available in workflow artifacts, not release assets."
           } > "$body"
 
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
