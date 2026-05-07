@@ -29,9 +29,10 @@ It is not a universal compatibility layer. A build that boots on one device, ROM
 | Android 12 GKI | `5.10` |
 | Android 14 GKI | `6.1` |
 | Android 15 GKI | `6.6` |
-| Android 16 GKI | `6.12` |
 
 Your selected GKI version must match your device and ROM.
+
+Android 16 `6.12` support is temporarily disabled while Android 16/Kleaf module and KMI issues are being cleaned up.
 
 ## Supported Root Manager Choices
 
@@ -84,7 +85,7 @@ Start small. Boot a basic build first, then add one advanced feature at a time.
 
 | Option | Meaning |
 | --- | --- |
-| `kernel_version` | Target Android GKI family: `5.10`, `6.1`, `6.6`, or `6.12`. |
+| `kernel_version` | Target Android GKI family: `5.10`, `6.1`, or `6.6`. |
 | `manager` | Root manager integration. Use `Vanilla` for no root manager. |
 | `manager_ref` | Optional manager git ref, commit, or tag for advanced testing. |
 | `source_mode` | Manual Build/Custom source choice. `google-lts` keeps the synced Google/AOSP LTS source; `maintained` uses the same maintained source mapping as the experimental release workflow; `custom` uses `source_repo`. |
@@ -108,7 +109,7 @@ Some workflows intentionally hide low-level fragment toggles to keep normal buil
 - Stable release matrix workflow reads `.github/matrix/release.json`.
 - Experimental release matrix workflow reads `.github/matrix/release_exp.json`.
 - `.github/matrix/release.json` contains only curated Google/AOSP-supported stable release variants.
-- `.github/matrix/release_exp.json` contains curated maintained-source experimental variants, including validated `6.12` SUSFS variants.
+- `.github/matrix/release_exp.json` contains curated maintained-source experimental variants.
 
 ### Source Modes
 
@@ -129,7 +130,6 @@ The manual `source_mode=maintained` flow and the experimental release workflow u
 - `5.10`: `https://github.com/ramabondanp/android_kernel_common-5.10`
 - `6.1`: `https://github.com/ramabondanp/android_kernel_common-6.1`
 - `6.6`: `https://github.com/ramabondanp/android_kernel_common-6.6`
-- `6.12`: `https://github.com/ramabondanp/android_kernel_common-6.12`
 
 These are experimental defaults, not stable release defaults.
 
@@ -140,15 +140,12 @@ These are experimental defaults, not stable release defaults.
   - `Custom Kernel Build`
 - Stable release matrix uses Google/AOSP LTS sources from `.github/matrix/release.json`.
 - Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json`, with optional `source_repo` / `source_ref` override.
-- The stable release matrix file excludes unsupported stable-only combinations such as the current `6.12` SUSFS release variants.
 
 ### SUSFS Note
 
 SUSFS support is validated per manager and per maintained source tree, not just per kernel version.
 
 - `5.10`, `6.1`, and `6.6` are validated on the maintained experimental source path for both `KernelSU` and `KowSU`.
-- `6.12` currently uses the upstream `gki-android16-6.12` SUSFS patch set on the maintained experimental source path.
-- The default Google/AOSP `6.12` source path used by stable workflows does not yet accept the current `6.12` SUSFS patch set, so the stable release matrix does not include `6.12` SUSFS variants. Use the experimental maintained-source path or a compatible source override for `6.12` SUSFS.
 - `KernelSU` and `KowSU` manager compatibility is still patch-source dependent, so custom source overrides can fail even when the default source path works.
 - Experimental source replacement and SUSFS together may still break build output, Wi-Fi, vendor modules, root, KMI/KCFI, or boot.
 

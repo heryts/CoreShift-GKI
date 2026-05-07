@@ -6,7 +6,7 @@ on:
       kernel_version:
         type: choice
         required: true
-        options: ["5.10", "6.1", "6.6", "6.12"]
+        options: ["5.10", "6.1", "6.6"]
       manager:
         type: choice
         required: true
@@ -126,11 +126,6 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ inputs.kernel_version }}" = "6.12" ] && [ "${{ inputs.susfs }}" = "on" ] && [ "${{ inputs.source_mode }}" = "google-lts" ]; then
-            echo "::error::6.12 SUSFS is currently validated only on maintained/custom source paths. Select source_mode=maintained or source_mode=custom with a compatible source tree."
-            exit 1
-          fi
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -206,9 +201,6 @@ jobs:
                 6.6)
                   effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.6"
                   ;;
-                6.12)
-                  effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.12"
-                  ;;
                 *)
                   echo "::error::No maintained source repo for kernel_version=${{ inputs.kernel_version }}"
                   exit 1
@@ -255,10 +247,6 @@ jobs:
         with:
           enabled: "true"
           kernel_version: ${{ inputs.kernel_version }}
-
-      - name: Fix stale KernelSU Kconfig include
-        if: inputs.kernel_version == '6.12' && inputs.source_mode == 'google-lts'
-        uses: ./.github/actions/fix-stale-kernelsu-kconfig
 
       - name: Init manager
         if: inputs.manager != 'Vanilla'

@@ -6,7 +6,7 @@ on:
       kernel_version:
         type: choice
         required: true
-        options: ["all", "5.10", "6.1", "6.6", "6.12"]
+        options: ["all", "5.10", "6.1", "6.6"]
         default: "all"
       source_repo:
         description: "Optional git repo URL to replace kernel/common"
@@ -178,9 +178,6 @@ jobs:
                 ;;
               6.6)
                 effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.6"
-                ;;
-              6.12)
-                effective_source_repo="https://github.com/ramabondanp/android_kernel_common-6.12"
                 ;;
               *)
                 echo "::error::No experimental default source repo for kernel_version=${{ matrix.kernel_version }}"
