@@ -153,15 +153,20 @@ Pixel validation status:
 
 - `android14-gs-pixel-6.1`: release matrix includes validated Vanilla,
   `KernelSU`, `KowSU`, SUSFS, BBG, and SUSFS+BBG combinations.
-- `android-gs-raviole-6.1-android16`: manager, SUSFS, and BBG patches apply on
-  the manifest source path `aosp`. The workflow maps this branch to
+- `android-gs-raviole-6.1-android16`: manager and BBG variants are validated on
+  the manifest source path `aosp`, but SUSFS variants are omitted because the
+  core SUSFS patch does not apply cleanly. The workflow maps this branch to
   `KERNEL_COMMON_DIR=kernel/aosp` and `KLEAF_DIST_TARGET=//aosp:kernel_aarch64_dist`.
 - `android-gs-bluejay-6.1-android16`: same source-root and target handling as
-  Raviole Android 16, with the same validated manager, SUSFS, BBG, and
-  SUSFS+BBG combinations.
+  Raviole Android 16, with validated manager and BBG variants. SUSFS variants
+  are omitted because the core SUSFS patch does not apply cleanly.
 - `android-gs-akita-6.1-android16`: source sync failed for the manifest-mapped
   `aosp` and `build/kernel` refs during validation, so it is not in the Pixel
   release matrix.
+
+Unsupported Pixel SUSFS variants are intentionally omitted from
+`.github/matrix/release_pixel.json`; the workflow does not dynamically generate
+unvalidated combinations.
 
 Pixel branches may use source roots and Kleaf packages that differ from generic
 GKI. The workflow discovers the manifest path for `kernel/common` and builds the

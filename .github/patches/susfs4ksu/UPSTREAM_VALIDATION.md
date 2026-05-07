@@ -66,3 +66,19 @@ manager patch.
 | 6.6 | maintained | KernelSU | PASS |
 | 6.6 | maintained | KowSU | PASS |
 
+## Pixel source validation
+
+Pixel source profile validation uses official Google Pixel kernel manifests and
+the same workflow patch order: sync source, initialize the selected manager,
+check and apply SUSFS, check and apply BBG, then generate config.
+
+| Pixel branch | Source root | KernelSU + SUSFS | KowSU + SUSFS | Matrix status |
+| --- | --- | --- | --- | --- |
+| `android14-gs-pixel-6.1` | `kernel/common` | PASS | PASS | SUSFS variants retained |
+| `android-gs-raviole-6.1-android16` | `kernel/aosp` | FAIL: core SUSFS patch does not apply | FAIL: core SUSFS patch does not apply | SUSFS variants omitted |
+| `android-gs-bluejay-6.1-android16` | `kernel/aosp` | FAIL: core SUSFS patch does not apply | FAIL: core SUSFS patch does not apply | SUSFS variants omitted |
+| `android-gs-akita-6.1-android16` | unresolved | unsupported/unvalidated | unsupported/unvalidated | omitted; manifest refs failed during sync |
+
+Unsupported Pixel SUSFS variants are intentionally omitted from
+`.github/matrix/release_pixel.json`. Non-SUSFS manager and BBG variants remain
+only where they were separately validated.
