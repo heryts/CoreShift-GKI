@@ -55,9 +55,10 @@ For your first root build, choose one manager and keep advanced features off. Co
 | **Build Kernel** | Build one manual kernel with stable defaults. | Single-build flow. Choose Google LTS, maintained, Pixel, or custom source with `source_mode`. Good first choice. |
 | **Custom Kernel Build** | Build one kernel with advanced manual feature options. | Single-build flow. Choose Google LTS, maintained, Pixel, or custom source with `source_mode`. |
 | **Build Kernel Release Matrix** | Build the curated stable release set. | Recommended release path. Uses Google/AOSP LTS sources. |
-| **Build Experimental Kernel Release Matrix** | Build curated maintained-source or Pixel experimental release sets. | Experimental path. Uses maintained GitHub `kernel/common` defaults or official Pixel manifests and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
+| **Build Experimental Kernel Release Matrix** | Build curated maintained-source/custom experimental release sets. | Experimental path. Uses maintained GitHub `kernel/common` defaults and may break build, Wi-Fi, modules, root, KMI/KCFI, or boot. |
+| **Build Pixel Kernel Release Matrix** | Build curated official Pixel-source prerelease sets. | Pixel-specific experimental path. UI asks only for Pixel branch; validated variants come from `.github/matrix/release_pixel.json`. |
 
-Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for maintained-source or Pixel release testing.
+Most users should start with **Build Kernel**. Use **Custom Kernel Build** only when you need extra control. Use the experimental release matrix only for maintained/custom release testing. Use the Pixel matrix workflow for official Pixel source testing.
 
 ## Quick Start
 
@@ -108,7 +109,8 @@ Some workflows intentionally hide low-level fragment toggles to keep normal buil
 ### Release Matrix Files
 
 - Stable release matrix workflow reads `.github/matrix/release.json`.
-- Experimental release matrix workflow reads `.github/matrix/release_exp.json` for maintained/custom profiles and `.github/matrix/release_pixel.json` for Pixel profiles.
+- Experimental release matrix workflow reads `.github/matrix/release_exp.json` for maintained/custom profiles.
+- Pixel release matrix workflow reads `.github/matrix/release_pixel.json`.
 - `.github/matrix/release.json` contains only curated Google/AOSP-supported stable release variants.
 - `.github/matrix/release_exp.json` contains curated maintained-source experimental variants.
 - `.github/matrix/release_pixel.json` contains curated official Pixel-manifest experimental variants.
@@ -172,7 +174,8 @@ through `kernel/common` and `//common:kernel_aarch64_dist`.
   - `Build Kernel`
   - `Custom Kernel Build`
 - Stable release matrix uses Google/AOSP LTS sources from `.github/matrix/release.json`.
-- Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json` or official Pixel manifests from `.github/matrix/release_pixel.json`. Custom experimental release runs reuse the maintained matrix shape with explicit `source_repo` / `source_ref`.
+- Experimental release matrix uses maintained GitHub `kernel/common` defaults from `.github/matrix/release_exp.json`. Custom experimental release runs reuse the maintained matrix shape with explicit `source_repo` / `source_ref`.
+- Pixel release matrix uses official Pixel manifests from `.github/matrix/release_pixel.json`; its UI exposes only the Pixel branch selector, and manager/SUSFS/BBG/LTO variants are fixed by the validated matrix.
 
 ### SUSFS Note
 

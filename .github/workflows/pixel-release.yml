@@ -1,0 +1,463 @@
+name: Build Pixel Kernel Release Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      pixel_branch:
+        type: choice
+        required: true
+        options:
+          - "all"
+          - "android14-gs-pixel-6.1"
+        default: "all"
+
+jobs:
+  prepare-matrix:
+    name: Prepare matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Pixel variant matrix
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          matrix="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          required = {
+              "kernel_version",
+              "source_branch",
+              "manager",
+              "susfs",
+              "lto",
+              "ikconfig",
+              "container_core",
+              "container_ipc",
+              "mount_filesystems",
+              "container_networking",
+              "fq_codel_features",
+              "performance_features",
+              "debug_features",
+              "heavy_debug_features",
+              "baseband_guard",
+              "strict_config",
+              "legacy_kmi_check",
+          }
+
+          matrix = json.loads(Path(".github/matrix/release_pixel.json").read_text())
+          include = matrix.get("include")
+
+          if not isinstance(include, list) or not include:
+              raise SystemExit("Pixel release matrix must contain a non-empty include list")
+
+          for index, variant in enumerate(include):
+              if not isinstance(variant, dict):
+                  raise SystemExit(f"variant {index} must be an object")
+
+              missing = sorted(required - set(variant))
+              extra = sorted(set(variant) - required)
+
+              if missing:
+                  raise SystemExit(f"variant {index} missing fields: {', '.join(missing)}")
+              if extra:
+                  raise SystemExit(f"variant {index} has unknown fields: {', '.join(extra)}")
+
+              unsafe_release_groups = {
+                  "debug_features",
+                  "heavy_debug_features",
+                  "fq_codel_features",
+                  "performance_features",
+                  "container_networking",
+              }
+              enabled_unsafe = sorted(
+                  key for key in unsafe_release_groups if variant.get(key) != "off"
+              )
+              if enabled_unsafe:
+                  label = (
+                      f"{variant['source_branch']} / {variant['manager']} / "
+                      f"SUSFS {variant['susfs']}"
+                  )
+                  raise SystemExit(
+                      f"Pixel release variant {index} ({label}) enables unsafe "
+                      f"release default groups: {', '.join(enabled_unsafe)}"
+                  )
+
+          requested = "${{ inputs.pixel_branch }}"
+          if requested != "all":
+              include = [variant for variant in include if variant["source_branch"] == requested]
+              if not include:
+                  raise SystemExit(f"no Pixel variants matched pixel_branch={requested}")
+
+          matrix["include"] = include
+
+          print(json.dumps(matrix, separators=(",", ":"), sort_keys=True))
+          PY
+          )"
+
+          echo "== selected Pixel variant count =="
+          MATRIX="$matrix" python3 -c 'import json, os; print(len(json.loads(os.environ["MATRIX"])["include"]))'
+
+          echo "== matrix JSON =="
+          printf '%s\n' "$matrix"
+
+          {
+            echo "matrix<<EOF"
+            printf '%s\n' "$matrix"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.source_branch }} / ${{ matrix.manager }} / SUSFS ${{ matrix.susfs }} / BBG ${{ matrix.baseband_guard }}
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Set variables
+        uses: ./.github/actions/setup-vars
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Select Pixel manifest branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "BRANCH=${{ matrix.source_branch }}" >> "$GITHUB_ENV"
+          echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
+          echo "Pixel source selected: official Google Pixel manifest branch ${{ matrix.source_branch }}"
+
+      - name: Install host tools
+        uses: ./.github/actions/install-host-tools
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Install repo
+        uses: ./.github/actions/install-repo
+
+      - name: Sync official Pixel source
+        uses: ./.github/actions/sync-kernel
+        with:
+          source_mode: pixel
+
+      - name: Validate Pixel build target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd kernel
+
+          target="${KLEAF_DIST_TARGET:-//common:kernel_aarch64_dist}"
+          common_rel="${KERNEL_COMMON_REL:-common}"
+
+          echo "KERNEL_COMMON_REL=$common_rel"
+          echo "KERNEL_COMMON_DIR=${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          echo "KLEAF_DIST_TARGET=$target"
+
+          if ! tools/bazel query "$target" >/tmp/coreshift-pixel-target.txt 2>/tmp/coreshift-pixel-target.err; then
+            echo "::error::Pixel build target is not available: $target"
+            echo "== bazel query error =="
+            cat /tmp/coreshift-pixel-target.err || true
+            echo "== discovered dist-like targets =="
+            tools/bazel query "kind(rule, //${common_rel}:*)" 2>/dev/null |
+              grep -E 'kernel.*dist|aarch64.*dist|pixel|gs' |
+              sort || true
+            exit 1
+          fi
+
+          cat /tmp/coreshift-pixel-target.txt
+
+      - name: Init manager
+        if: matrix.manager != 'Vanilla'
+        uses: ./.github/actions/init-manager
+        with:
+          manager: ${{ matrix.manager }}
+          manager_ref: ""
+          susfs: ${{ matrix.susfs }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Apply SUSFS4KSU patches
+        if: matrix.susfs == 'on'
+        uses: ./.github/actions/apply-susfs
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+
+      - name: Apply Baseband Guard
+        if: matrix.baseband_guard == 'on'
+        uses: ./.github/actions/apply-baseband-guard
+        with:
+          baseband_guard: ${{ matrix.baseband_guard }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Create private config fragment
+        uses: ./.github/actions/create-config-fragment
+        with:
+          ikconfig: ${{ matrix.ikconfig }}
+          container_core: ${{ matrix.container_core }}
+          container_ipc: ${{ matrix.container_ipc }}
+          mount_filesystems: ${{ matrix.mount_filesystems }}
+          container_networking: ${{ matrix.container_networking }}
+          fq_codel_features: ${{ matrix.fq_codel_features }}
+          performance_features: ${{ matrix.performance_features }}
+          debug_features: ${{ matrix.debug_features }}
+          heavy_debug_features: ${{ matrix.heavy_debug_features }}
+          susfs: ${{ matrix.susfs }}
+          baseband_guard: ${{ matrix.baseband_guard }}
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Apply IPC KABI patches
+        if: matrix.container_ipc == 'on'
+        uses: ./.github/actions/apply-ipc-kabi-patches
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Add swap for full LTO
+        if: matrix.lto == 'full'
+        uses: ./.github/actions/add-swap
+        with:
+          size_gb: "16"
+
+      - name: Add swap for thin LTO
+        if: matrix.lto == 'thin'
+        uses: ./.github/actions/add-swap
+        with:
+          size_gb: "8"
+
+      - name: Commit kernel changes
+        uses: ./.github/actions/commit-kernel-changes
+
+      - name: Build kernel
+        uses: ./.github/actions/build-kernel
+        with:
+          lto: ${{ matrix.lto }}
+          kernel_version: ${{ matrix.kernel_version }}
+          source_mode: pixel
+
+      - name: Write compiler metadata
+        uses: ./.github/actions/write-compiler-metadata
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+
+      - name: Verify final config
+        uses: ./.github/actions/verify-final-config
+        with:
+          strict_config: ${{ matrix.strict_config }}
+
+      - name: Set release output names
+        id: release-name
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          susfs_label=""
+          if [ "${{ matrix.susfs }}" = "on" ]; then
+            susfs_label="-susfs"
+          fi
+
+          bbg_label=""
+          if [ "${{ matrix.baseband_guard }}" = "on" ]; then
+            bbg_label="-bbg"
+          fi
+
+          variant_suffix="${susfs_label}${bbg_label}"
+
+          upstream="$(
+            awk -F' = ' '
+              /^VERSION =/ {v=$2}
+              /^PATCHLEVEL =/ {p=$2}
+              /^SUBLEVEL =/ {s=$2}
+              /^EXTRAVERSION =/ {e=$2}
+              END {printf "%s.%s.%s%s\n", v, p, s, e}
+            ' "${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}/Makefile"
+          )"
+
+          final_name="v${upstream}-gki-pixel-${{ matrix.source_branch }}-${{ matrix.manager }}${variant_suffix}-${DATE}"
+
+          {
+            echo "variant_suffix=${variant_suffix}"
+            echo "final_name=${final_name}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Export final config
+        uses: ./.github/actions/export-final-config
+        env:
+          CONFIG_NAME_SUFFIX: ${{ steps.release-name.outputs.variant_suffix }}
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+          susfs: ${{ matrix.susfs }}
+
+      - name: Package
+        uses: ./.github/actions/package-kernel
+        with:
+          kernel_version: ${{ matrix.kernel_version }}
+          manager: ${{ matrix.manager }}
+          susfs: ${{ matrix.susfs }}
+          final_name: ${{ steps.release-name.outputs.final_name }}
+
+      - name: Stage compiler metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cp compiler-version.txt "compiler-version-${{ steps.release-name.outputs.final_name }}.txt"
+
+      - name: Write release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "kernel_version=${{ matrix.kernel_version }}"
+            echo "source_profile=pixel"
+            echo "source_branch=${{ matrix.source_branch }}"
+            echo "source_root=${KERNEL_COMMON_REL:-common}"
+            echo "kleaf_target=${KLEAF_DIST_TARGET:-//common:kernel_aarch64_dist}"
+            echo "manager=${{ matrix.manager }}"
+            echo "susfs=${{ matrix.susfs }}"
+            echo "lto=${{ matrix.lto }}"
+            echo "ikconfig=${{ matrix.ikconfig }}"
+            echo "container_core=${{ matrix.container_core }}"
+            echo "container_ipc=${{ matrix.container_ipc }}"
+            echo "mount_filesystems=${{ matrix.mount_filesystems }}"
+            echo "container_networking=${{ matrix.container_networking }}"
+            echo "fq_codel_features=${{ matrix.fq_codel_features }}"
+            echo "performance_features=${{ matrix.performance_features }}"
+            echo "debug_features=${{ matrix.debug_features }}"
+            echo "heavy_debug_features=${{ matrix.heavy_debug_features }}"
+            echo "baseband_guard=${{ matrix.baseband_guard }}"
+            echo "strict_config=${{ matrix.strict_config }}"
+            echo "legacy_kmi_check=${{ matrix.legacy_kmi_check }}"
+            echo "name=${FINAL_NAME}"
+          } > release-manifest.txt
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-pixel-${{ matrix.source_branch }}-${{ matrix.manager }}${{ steps.release-name.outputs.variant_suffix }}-${{ env.DATE }}
+          path: |
+            *.zip
+            out/Image-*
+            out/config-*
+            compiler-version.txt
+            compiler-version-${{ steps.release-name.outputs.final_name }}.txt
+            release-manifest.txt
+          if-no-files-found: error
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: false
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          date="$(date +'%Y%m%d')"
+          tag="coreshift-gki-pixel-${date}-${GITHUB_RUN_NUMBER}"
+          release_dir="$PWD/release-zips"
+          body="$PWD/release-body.md"
+
+          mkdir -p "$release_dir"
+
+          find release-artifacts -type f -name '*.zip' -print0 |
+            while IFS= read -r -d '' file; do
+              cp "$file" "$release_dir/$(basename "$file")"
+            done
+
+          if ! find "$release_dir" -type f -name '*.zip' -print -quit | grep -q .; then
+            echo "::error::Release requested but no flashable zip files were found."
+            exit 1
+          fi
+
+          {
+            echo "CoreShift GKI Pixel experimental prerelease"
+            echo
+            echo "Experimental Pixel prerelease. Official Pixel source builds are Pixel-specific, Pixel 6+ only, and are not generic GKI outputs."
+            echo
+            echo "- Date: $date"
+            echo "- Run: $GITHUB_RUN_NUMBER"
+            echo
+            echo "Included builds:"
+
+            while IFS= read -r manifest; do
+              source_branch="$(sed -n 's/^source_branch=//p' "$manifest")"
+              source_root="$(sed -n 's/^source_root=//p' "$manifest")"
+              kleaf_target="$(sed -n 's/^kleaf_target=//p' "$manifest")"
+              manager="$(sed -n 's/^manager=//p' "$manifest")"
+              susfs="$(sed -n 's/^susfs=//p' "$manifest")"
+              lto="$(sed -n 's/^lto=//p' "$manifest")"
+              baseband_guard="$(sed -n 's/^baseband_guard=//p' "$manifest")"
+
+              susfs_label="Disabled"
+              if [ "$susfs" = "on" ]; then
+                susfs_label="Enabled"
+              fi
+
+              bbg_label="Disabled"
+              if [ "$baseband_guard" = "on" ]; then
+                bbg_label="Enabled"
+              fi
+
+              printf -- '- %s | %s | LTO %s | SUSFS %s | BBG %s | Source %s | Target %s\n' \
+                "$source_branch" \
+                "$manager" \
+                "$lto" \
+                "$susfs_label" \
+                "$bbg_label" \
+                "$source_root" \
+                "$kleaf_target"
+            done < <(find release-artifacts -type f -name release-manifest.txt | sort)
+
+            echo
+            echo "Configs, raw images, compiler metadata, and manifests are available in workflow artifacts, not release assets."
+          } > "$body"
+
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_BODY=$body" >> "$GITHUB_ENV"
+
+          echo "== release files =="
+          find "$release_dir" -type f -printf '%f\n' | sort
+          echo
+          echo "== release body =="
+          cat "$body"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          files: release-zips/*.zip
+          body_path: ${{ env.RELEASE_BODY }}
+          prerelease: true
