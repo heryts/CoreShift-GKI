@@ -147,11 +147,21 @@ The manual `source_mode=pixel` flow and the experimental `source_profile=pixel` 
 
 Pixel source mode is experimental, Pixel 6+ specific, and not generic GKI LTS. It may need Pixel-specific modules or images and can fail on non-Pixel devices. If a Pixel branch does not expose `//common:kernel_aarch64_dist`, the build reports that target mismatch instead of pretending the generic GKI target is valid.
 
-The Pixel experimental release matrix keeps Android 16 Pixel branches
-Vanilla-only until each manager and feature combination is validated per branch.
-For `android14-gs-pixel-6.1`, `KernelSU`, `KowSU`, SUSFS, and BBG patch/setup
-combinations have passed workflow-order validation. Other Pixel branches do not
-advertise manager, SUSFS, or BBG variants yet.
+Pixel validation status:
+
+- `android14-gs-pixel-6.1`: release matrix includes validated Vanilla,
+  `KernelSU`, `KowSU`, SUSFS, BBG, and SUSFS+BBG combinations.
+- `android-gs-raviole-6.1-android16`: manager, SUSFS, and BBG patches apply on
+  the manifest source path `aosp`, but the current workflow target/path is not
+  validated because this branch does not use `kernel/common` as the source path
+  or expose a confirmed `//common:kernel_aarch64_dist` target.
+- `android-gs-bluejay-6.1-android16`: same status as Raviole Android 16.
+- `android-gs-akita-6.1-android16`: source sync failed for the manifest-mapped
+  `aosp` and `build/kernel` refs during validation, so it is not in the Pixel
+  release matrix.
+
+Android 16 Pixel branches are omitted from the experimental release matrix until
+their source path and Bazel target mapping are handled explicitly.
 
 ### Source Policy
 
