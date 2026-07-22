@@ -1,11 +1,12 @@
 name: Merge nomount hookless
 on: workflow_dispatch
 
+permissions:
+  contents: write
+
 jobs:
   merge:
     runs-on: ubuntu-latest
-    permissions:
-    contents: write
     steps:
       - uses: actions/checkout@v4
         with:
