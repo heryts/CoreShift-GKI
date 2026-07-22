@@ -1,0 +1,23 @@
+name: Merge nomount hookless
+on: workflow_dispatch
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+      - name: Add nomount remote and merge
+        run: |
+          git checkout -b integrate-nomount
+          git remote add nomount https://github.com/maxsteeel/nomount.git
+          git fetch nomount experimental/hookless
+          git subtree add --prefix=drivers/nomount nomount experimental/hookless --squash
+      - name: Push branch
+        run: git push origin integrate-nomount
