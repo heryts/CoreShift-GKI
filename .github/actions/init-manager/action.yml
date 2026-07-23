@@ -39,6 +39,18 @@ runs:
 
         git submodule update --init --depth 1 --single-branch "manager/${MANAGER}"
 
+        if [ "$MANAGER" = "KernelSU-Next" ]; then
+          echo "== unshallow KernelSU-Next submodule =="
+          echo "needed for correct version code (commit count) and tag lookups"
+          if [ "$(git -C "manager/${MANAGER}" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+            git -C "manager/${MANAGER}" fetch --unshallow origin
+            git -C "manager/${MANAGER}" fetch --tags origin || true
+            echo "submodule unshallowed, commit count now: $(git -C "manager/${MANAGER}" rev-list --count HEAD)"
+          else
+            echo "submodule already not shallow, skipping"
+          fi
+        fi
+
         if [ -n "${{ inputs.manager_ref }}" ]; then
           SELECTED_MANAGER_REF="${{ inputs.manager_ref }}"
           MANAGER_REF_SOURCE="explicit"
