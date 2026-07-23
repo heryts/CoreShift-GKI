@@ -3,7 +3,7 @@ description: Apply SUSFS4KSU source files and patches for selected GKI version.
 inputs:
   kernel_version:
     required: true
-    description: Kernel version to patch.
+    description: Kernel version tfo patch.
   manager:
     required: true
     description: Selected manager.
@@ -115,7 +115,7 @@ runs:
         echo
         echo "== locate integrated KernelSU root =="
         KSU_MARKERS="$(
-          find "$COMMON_DIR" \
+          find -L "$COMMON_DIR" \
             -type f \
             -path "*/kernel/include/ksu.h" \
             -print
