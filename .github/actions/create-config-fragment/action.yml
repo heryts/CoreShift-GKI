@@ -1,7 +1,7 @@
 name: Create private config fragment
 description: Generate private.fragment and private.required from workflow inputs.
 inputs:
-manager:
+  manager:
     required: true
     description: Selected manager, used to select SUSFS Kconfig symbol source.
   ikconfig:
