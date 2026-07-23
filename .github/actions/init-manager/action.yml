@@ -189,7 +189,7 @@ runs:
 
         echo "== verify integrated KernelSU =="
         KSU_MARKERS="$(
-          find "$COMMON_DIR" \
+          find -L "$COMMON_DIR" \
             -type f \
             -path "*/kernel/include/ksu.h" \
             -print || true
