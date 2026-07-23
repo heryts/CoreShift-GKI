@@ -187,8 +187,10 @@ runs:
         if [ "${{ inputs.susfs }}" = "on" ]; then
           if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
             echo "== SUSFS config: KernelSU-Next (hookless/kprobes fork) =="
-            echo "Using fork-native symbol KSU_KPROBES_SUSFS instead of generic susfs4ksu patch names."
+            echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT"
+            echo "instead of generic susfs4ksu patch names."
             add_config KSU_KPROBES_SUSFS y
+            add_config KSU_KPROBES_NOMOUNT y
           else
             case "${{ inputs.kernel_version }}" in
               5.10)
