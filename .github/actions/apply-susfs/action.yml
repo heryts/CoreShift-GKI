@@ -141,13 +141,20 @@ runs:
         cd "$KSU_ROOT"
 
         echo
-        echo "== check/apply KernelSU SUSFS patch from KSU_ROOT =="
-        git apply --check "$KSU_PATCH"
-        git apply "$KSU_PATCH"
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          echo "== skipping generic KernelSU SUSFS enablement patch =="
+          echo "manager=KernelSU-Next uses a fork (MirahSyakilla/KSUN, susfs+nomount-hookless)"
+          echo "with SUSFS wiring already integrated in-tree; applying the generic"
+          echo "10_enable_susfs_for_ksu.patch on top would conflict with that integration."
+        else
+          echo "== check/apply KernelSU SUSFS patch from KSU_ROOT =="
+          git apply --check "$KSU_PATCH"
+          git apply "$KSU_PATCH"
 
-        if grep -RInE '^(<<<<<<< .+|=======$|>>>>>>> .+)$' kernel; then
-          echo "::error::conflict markers found after KernelSU SUSFS patch"
-          exit 1
+          if grep -RInE '^(<<<<<<< .+|=======$|>>>>>>> .+)$' kernel; then
+            echo "::error::conflict markers found after KernelSU SUSFS patch"
+            exit 1
+          fi
         fi
 
         cd "$COMMON_DIR"
