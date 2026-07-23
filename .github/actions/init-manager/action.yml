@@ -53,7 +53,11 @@ runs:
             'KowSU     5.10    cf087d755af8e322e6840d02b082a7b3871726c7' \
             'KowSU     6.1     cf087d755af8e322e6840d02b082a7b3871726c7' \
             'KowSU     6.6     cf087d755af8e322e6840d02b082a7b3871726c7' \
-            'KowSU     6.12    cf087d755af8e322e6840d02b082a7b3871726c7'
+            'KowSU     6.12    cf087d755af8e322e6840d02b082a7b3871726c7' \
+            'KernelSU-Next 5.10 (pinned via .gitmodules branch)' \
+            'KernelSU-Next 6.1  (pinned via .gitmodules branch)' \
+            'KernelSU-Next 6.6  (pinned via .gitmodules branch)' \
+            'KernelSU-Next 6.12 (pinned via .gitmodules branch)'
 
           case "${MANAGER}:${KERNEL_VERSION}" in
             KernelSU:5.10|KernelSU:6.1|KernelSU:6.6|KernelSU:6.12)
@@ -63,6 +67,14 @@ runs:
             KowSU:5.10|KowSU:6.1|KowSU:6.6|KowSU:6.12)
               SELECTED_MANAGER_REF="cf087d755af8e322e6840d02b082a7b3871726c7"
               MANAGER_REF_SOURCE="susfs-default"
+              ;;
+            KernelSU-Next:5.10|KernelSU-Next:6.1|KernelSU-Next:6.6|KernelSU-Next:6.12)
+              # The MirahSyakilla/KSUN fork's susfs+nomount-hookless branch is
+              # already SUSFS-integrated at the source (see .gitmodules), so no
+              # separate ref override is needed here — the submodule checkout
+              # from that branch is itself the SUSFS-compatible commit.
+              SELECTED_MANAGER_REF=""
+              MANAGER_REF_SOURCE="susfs-default (KSUN susfs+nomount-hookless branch)"
               ;;
             *)
               echo "::error::No SUSFS-compatible default manager ref for manager=${MANAGER}, kernel_version=${KERNEL_VERSION}. Set manager_ref explicitly."
