@@ -125,6 +125,12 @@ runs:
         echo "setup_script=$SETUP_SCRIPT"
         echo "setup_ref=${SELECTED_MANAGER_REF:-none}"
 
+        if [ "$MANAGER" = "KernelSU-Next" ]; then
+          echo "== link expected KernelSU-Next repo folder to submodule =="
+          ln -sfn "$MANAGER_DIR" "$COMMON_DIR/KernelSU-Next"
+          echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
+        fi
+
         cd "$COMMON_DIR"
 
         if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; }; then
