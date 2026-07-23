@@ -103,6 +103,13 @@ runs:
         echo "manager HEAD: $MANAGER_HEAD"
         echo "manager describe: $MANAGER_DESCRIBE"
 
+         # Snapshot the exact submodule commit we intend to build with, so we
+        # can restore it after running the manager's setup.sh. Some setup.sh
+        # scripts (e.g. KernelSU-Next's) do their own git stash/checkout/pull
+        # inside the manager directory, which can silently move the checkout
+        # away from the .gitmodules-pinned branch/commit.
+        PRE_SETUP_MANAGER_HEAD="$MANAGER_HEAD"
+
         # Critical fix:
         # If no explicit/SUSFS ref was selected, pass the actual submodule HEAD
         # into KernelSU/KowSU setup.sh instead of letting setup.sh use its own default.
@@ -133,10 +140,30 @@ runs:
 
         cd "$COMMON_DIR"
 
+        if [ "$MANAGER" = "KernelSU-Next" ]; then
+          echo "== link expected KernelSU-Next repo folder to submodule =="
+          ln -sfn "$MANAGER_DIR" "$COMMON_DIR/KernelSU-Next"
+          echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
+        fi
+
         if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; }; then
           bash "$SETUP_SCRIPT" "$SELECTED_MANAGER_REF"
         else
           bash "$SETUP_SCRIPT"
+        fi
+
+        if [ "$MANAGER" = "KernelSU-Next" ]; then
+          echo "== restore pinned submodule commit after setup.sh =="
+          echo "setup.sh may have run git stash/checkout/pull inside the submodule;"
+          echo "forcing it back to the .gitmodules-pinned commit: $PRE_SETUP_MANAGER_HEAD"
+          git -C "$MANAGER_DIR" checkout -f "$PRE_SETUP_MANAGER_HEAD"
+          RESTORED_HEAD="$(git -C "$MANAGER_DIR" rev-parse HEAD)"
+          if [ "$RESTORED_HEAD" != "$PRE_SETUP_MANAGER_HEAD" ]; then
+            echo "::error::failed to restore submodule to pinned commit after setup.sh"
+            echo "::error::expected=$PRE_SETUP_MANAGER_HEAD actual=$RESTORED_HEAD"
+            exit 1
+          fi
+          echo "restored manager HEAD: $RESTORED_HEAD"
         fi
 
         if { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; } &&
