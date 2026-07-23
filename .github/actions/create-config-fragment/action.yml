@@ -187,8 +187,12 @@ runs:
         if [ "${{ inputs.susfs }}" = "on" ]; then
           if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
             echo "== SUSFS config: KernelSU-Next (hookless/kprobes fork) =="
-            echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT"
-            echo "instead of generic susfs4ksu patch names."
+            echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT."
+            echo "Also enabling their Kconfig dependency chain: KPROBES, KRETPROBES,"
+            echo "KALLSYMS (required by KSU_KPROBES_HOOK / KSU_KPROBES_NOMOUNT)."
+            add_config KPROBES y
+            add_config KRETPROBES y
+            add_config KALLSYMS y
             add_config KSU_KPROBES_SUSFS y
             add_config KSU_KPROBES_NOMOUNT y
           else
