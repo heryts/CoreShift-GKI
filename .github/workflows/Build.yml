@@ -274,6 +274,7 @@ jobs:
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
+          manager: ${{ inputs.manager }}
           ikconfig: ${{ env.IKCONFIG }}
           container_core: ${{ env.CONTAINER_CORE }}
           container_ipc: ${{ env.CONTAINER_IPC }}
