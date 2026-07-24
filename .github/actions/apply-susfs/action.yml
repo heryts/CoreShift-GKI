@@ -141,7 +141,7 @@ runs:
         cd "$KSU_ROOT"
 
         echo
-        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ] && [ "${{ inputs.kernel_version }}" = "5.10" ]; then
           echo "== skipping generic KernelSU SUSFS enablement patch =="
           echo "manager=KernelSU-Next uses a fork (MirahSyakilla/KSUN, susfs+nomount-hookless)"
           echo "with SUSFS wiring already integrated in-tree; applying the generic"
