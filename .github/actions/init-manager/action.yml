@@ -62,7 +62,11 @@ runs:
             )"
             echo "upstream default branch: $UPSTREAM_DEFAULT_BRANCH"
 
-            git -C "manager/${MANAGER}" fetch --depth 1 origin "$UPSTREAM_DEFAULT_BRANCH"
+            # Fetch full history directly (not shallow) to avoid a
+            # "shallow file has changed since we read it" error from
+            # doing a shallow fetch immediately followed by --unshallow.
+            git -C "manager/${MANAGER}" fetch --unshallow origin "$UPSTREAM_DEFAULT_BRANCH" ||
+              git -C "manager/${MANAGER}" fetch origin "$UPSTREAM_DEFAULT_BRANCH"
             git -C "manager/${MANAGER}" checkout FETCH_HEAD
           fi
 
