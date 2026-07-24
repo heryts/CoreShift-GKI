@@ -3,7 +3,7 @@
 	url = https://github.com/tiann/KernelSU.git
 [submodule "manager/KernelSU-Next"]
 	path = manager/KernelSU-Next
-	url = https://github.com/MirahSyakilla/KSUN.git
+	url = https://github.com/heryts/KSUN.git
 	branch = susfs+nomount-hookless
 	#url = https://github.com/KernelSU-Next/KernelSU-Next.git
 [submodule "manager/KowSU"]
