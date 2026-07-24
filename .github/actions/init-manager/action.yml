@@ -40,6 +40,27 @@ runs:
         git submodule update --init --depth 1 --single-branch "manager/${MANAGER}"
 
         if [ "$MANAGER" = "KernelSU-Next" ]; then
+          if [ "$KERNEL_VERSION" = "5.10" ]; then
+            echo "== KernelSU-Next: using MirahSyakilla/KSUN fork (validated for 5.10) =="
+            echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
+          else
+            echo "== KernelSU-Next: kernel_version=$KERNEL_VERSION, switching to upstream =="
+            echo "MirahSyakilla/KSUN fork is only validated for kernel_version=5.10;"
+            echo "falling back to KernelSU-Next/KernelSU-Next for other kernel versions."
+
+            git -C "manager/${MANAGER}" remote set-url origin https://github.com/KernelSU-Next/KernelSU-Next.git
+            git -C "manager/${MANAGER}" fetch --depth 1 origin
+
+            UPSTREAM_DEFAULT_BRANCH="$(
+            git -C "manager/${MANAGER}" remote show origin |
+            sed -n 's/^[[:space:]]*HEAD branch: //p'
+            )"
+            echo "upstream default branch: $UPSTREAM_DEFAULT_BRANCH"
+
+            git -C "manager/${MANAGER}" fetch --depth 1 origin "$UPSTREAM_DEFAULT_BRANCH"
+            git -C "manager/${MANAGER}" checkout FETCH_HEAD
+          fi
+
           echo "== unshallow KernelSU-Next submodule =="
           echo "needed for correct version code (commit count) and tag lookups"
           if [ "$(git -C "manager/${MANAGER}" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
@@ -47,10 +68,10 @@ runs:
             git -C "manager/${MANAGER}" fetch --tags origin || true
             echo "submodule unshallowed, commit count now: $(git -C "manager/${MANAGER}" rev-list --count HEAD)"
           else
-            echo "submodule already not shallow, skipping"
+          echo "submodule already not shallow, skipping"
           fi
         fi
-
+    
         if [ -n "${{ inputs.manager_ref }}" ]; then
           SELECTED_MANAGER_REF="${{ inputs.manager_ref }}"
           MANAGER_REF_SOURCE="explicit"
