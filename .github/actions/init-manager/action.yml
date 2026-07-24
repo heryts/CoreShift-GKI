@@ -49,7 +49,12 @@ runs:
             echo "falling back to KernelSU-Next/KernelSU-Next for other kernel versions."
 
             git -C "manager/${MANAGER}" remote set-url origin https://github.com/KernelSU-Next/KernelSU-Next.git
-            git -C "manager/${MANAGER}" fetch --depth 1 origin
+            # The submodule was cloned with --single-branch, which locks
+            # the fetch refspec to the old branch name from .gitmodules
+            # (susfs+nomount-hookless). Reset it to the default wildcard
+            # refspec so we can fetch any branch from the new upstream URL.
+            git -C "manager/${MANAGER}" config remote.origin.fetch \
+              "+refs/heads/*:refs/remotes/origin/*"
 
             UPSTREAM_DEFAULT_BRANCH="$(
             git -C "manager/${MANAGER}" remote show origin |
@@ -68,10 +73,10 @@ runs:
             git -C "manager/${MANAGER}" fetch --tags origin || true
             echo "submodule unshallowed, commit count now: $(git -C "manager/${MANAGER}" rev-list --count HEAD)"
           else
-          echo "submodule already not shallow, skipping"
+            echo "submodule already not shallow, skipping"
           fi
         fi
-    
+
         if [ -n "${{ inputs.manager_ref }}" ]; then
           SELECTED_MANAGER_REF="${{ inputs.manager_ref }}"
           MANAGER_REF_SOURCE="explicit"
