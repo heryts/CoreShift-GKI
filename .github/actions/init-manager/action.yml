@@ -56,18 +56,16 @@ runs:
             git -C "manager/${MANAGER}" config remote.origin.fetch \
               "+refs/heads/*:refs/remotes/origin/*"
 
-            UPSTREAM_DEFAULT_BRANCH="$(
-            git -C "manager/${MANAGER}" remote show origin |
-            sed -n 's/^[[:space:]]*HEAD branch: //p'
-            )"
-            echo "upstream default branch: $UPSTREAM_DEFAULT_BRANCH"
+            # Pin to v3.2.0 instead of the upstream default branch. Newer
+            # upstream commits (post v3.2.0, leading into v3.3.0) restructured
+            # the kernel/ layout (kernel/feature/, kernel/hook/, etc.), which
+            # breaks the repo's existing generic 10_enable_susfs_for_ksu.patch.
+            UPSTREAM_PIN_TAG="v3.2.0"
+            echo "upstream pin: $UPSTREAM_PIN_TAG (pre-kernel-layout-restructure)"
 
-            # Fetch full history directly (not shallow) to avoid a
-            # "shallow file has changed since we read it" error from
-            # doing a shallow fetch immediately followed by --unshallow.
-            git -C "manager/${MANAGER}" fetch --unshallow origin "$UPSTREAM_DEFAULT_BRANCH" ||
-              git -C "manager/${MANAGER}" fetch origin "$UPSTREAM_DEFAULT_BRANCH"
-            git -C "manager/${MANAGER}" checkout FETCH_HEAD
+            git -C "manager/${MANAGER}" fetch --unshallow origin "refs/tags/${UPSTREAM_PIN_TAG}" ||
+              git -C "manager/${MANAGER}" fetch origin "refs/tags/${UPSTREAM_PIN_TAG}"
+            git -C "manager/${MANAGER}" checkout "tags/${UPSTREAM_PIN_TAG}"
           fi
 
           echo "== unshallow KernelSU-Next submodule =="
