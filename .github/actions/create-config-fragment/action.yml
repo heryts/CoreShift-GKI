@@ -195,6 +195,10 @@ runs:
             add_config KALLSYMS y
             add_config KSU_KPROBES_SUSFS y
             add_config KSU_KPROBES_NOMOUNT y
+            echo "Enabling ARM64 branch-link hook mode (KSU_HACK_ARM64_BRANCH_LINK)."
+            echo "This is opt-in (default n) but is what the fork's SUSFS help text"
+            echo "describes as the intended hook path for kstat/mount tracking."
+            add_config KSU_HACK_ARM64_BRANCH_LINK y
           else
             case "${{ inputs.kernel_version }}" in
               5.10)
