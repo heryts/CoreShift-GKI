@@ -185,7 +185,7 @@ runs:
         fi
 
         if [ "${{ inputs.susfs }}" = "on" ]; then
-          if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          if [ "${{ inputs.manager }}" = "KernelSU-Next" ] && [ "${{ inputs.kernel_version }}" = "5.10" ]; then
             echo "== SUSFS config: KernelSU-Next (hookless/kprobes fork) =="
             echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT."
             echo "Also enabling their Kconfig dependency chain: KPROBES, KRETPROBES,"
