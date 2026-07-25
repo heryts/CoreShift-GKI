@@ -40,34 +40,10 @@ runs:
         git submodule update --init --depth 1 --single-branch "manager/${MANAGER}"
 
         if [ "$MANAGER" = "KernelSU-Next" ]; then
-          if [ "$KERNEL_VERSION" = "5.10" ]; then
-            echo "== KernelSU-Next: using MirahSyakilla/KSUN fork (validated for 5.10) =="
-            echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
-          else
-            echo "== KernelSU-Next: kernel_version=$KERNEL_VERSION, switching to upstream =="
-            echo "MirahSyakilla/KSUN fork is only validated for kernel_version=5.10;"
-            echo "falling back to KernelSU-Next/KernelSU-Next for other kernel versions."
-
-            git -C "manager/${MANAGER}" remote set-url origin https://github.com/KernelSU-Next/KernelSU-Next.git
-            # The submodule was cloned with --single-branch, which locks
-            # the fetch refspec to the old branch name from .gitmodules
-            # (susfs+nomount-hookless). Reset it to the default wildcard
-            # refspec so we can fetch any branch from the new upstream URL.
-            git -C "manager/${MANAGER}" config remote.origin.fetch \
-              "+refs/heads/*:refs/remotes/origin/*"
-
-            # Pin to v3.2.0 instead of the upstream default branch. Newer
-            # upstream commits (post v3.2.0, leading into v3.3.0) restructured
-            # the kernel/ layout (kernel/feature/, kernel/hook/, etc.), which
-            # breaks the repo's existing generic 10_enable_susfs_for_ksu.patch.
-            UPSTREAM_PIN_TAG="v3.2.0"
-            echo "upstream pin: $UPSTREAM_PIN_TAG (pre-kernel-layout-restructure)"
-
-            git -C "manager/${MANAGER}" fetch --unshallow origin "refs/tags/${UPSTREAM_PIN_TAG}" ||
-              git -C "manager/${MANAGER}" fetch origin "refs/tags/${UPSTREAM_PIN_TAG}"
-            git -C "manager/${MANAGER}" checkout FETCH_HEAD
-          fi
-
+          echo "== KernelSU-Next: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
+          echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
+          echo "used for all kernel_version values until the fork gains 6.1/6.6 support"
+          
           echo "== unshallow KernelSU-Next submodule =="
           echo "needed for correct version code (commit count) and tag lookups"
           if [ "$(git -C "manager/${MANAGER}" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
