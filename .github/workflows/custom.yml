@@ -105,14 +105,6 @@ on:
         required: true
         options: ["on", "off"]
         default: "on"
-      custom_version_name:
-        description: "Custom version name (optional)"
-        required: false
-        default: ""
-      custom_build_time:
-        description: "Custom build time (blank = current UTC)"
-        required: false
-        default: ""
       droidspaces:
         description: "Droidspaces support (5.10~6.6: slot patch, 6.12: on/off)"
         type: choice
@@ -403,14 +395,6 @@ jobs:
 
       - name: Commit kernel changes
         uses: ./.github/actions/commit-kernel-changes
-
-      - name: Set custom build time
-        if: inputs.custom_build_time != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "KBUILD_BUILD_TIMESTAMP=${{ inputs.custom_build_time }}" >> "$GITHUB_ENV"
-          echo "using custom build time: ${{ inputs.custom_build_time }}"
 
       - name: Build kernel
         uses: ./.github/actions/build-kernel
