@@ -16,6 +16,14 @@ inputs:
     required: false
     default: "off"
     description: Enable Re-Kernel driver Kconfig.
+  add_nomount:
+     required: false
+     default: "off"
+     description: Enable standalone NoMount (MirahSyakilla/nomount), takes precedence over fork built-in NoMount for manager=KernelSU-Next.
+  add_nomount_maxsteeel:
+    required: false
+    default: "off"
+    description: Enable maxsteeel/nomount (manager-agnostic VFS-level NoMount, independent from fork built-in NoMount).
   ikconfig:
     required: true
     description: Enable IKCONFIG.
@@ -278,6 +286,11 @@ runs:
         if [ "${{ inputs.re_kernel }}" = "on" ]; then
           echo "== Re-Kernel config =="
           add_config REKERNEL y
+        fi
+
+        if [ "${{ inputs.add_nomount_maxsteeel }}" = "on" ]; then
+          echo "== NoMount (maxsteeel) config =="
+          add_config NOMOUNT y
         fi
 
         if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
