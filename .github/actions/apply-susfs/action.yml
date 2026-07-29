@@ -3,7 +3,7 @@ description: Apply SUSFS4KSU source files and patches for selected GKI version.
 inputs:
   kernel_version:
     required: true
-    description: Kernel version tfo patch.
+    description: Kernel version to patch.
   manager:
     required: true
     description: Selected manager.
