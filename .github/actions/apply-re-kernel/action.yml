@@ -1,0 +1,78 @@
+name: Apply Re-Kernel driver
+description: Vendor and enable the Re-Kernel GKI Vendor Hooks driver.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version being patched, used to enable the matching Re-Kernel version macro.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+
+        echo "== Re-Kernel driver =="
+        TMP_DIR="$(mktemp -d)"
+        git clone --depth 1 https://github.com/Sakion-Team/Re-Kernel.git "$TMP_DIR/Re-Kernel"
+
+        DRIVER_DIR="$COMMON_DIR/drivers/rekernel"
+        mkdir -p "$DRIVER_DIR"
+        cp "$TMP_DIR/Re-Kernel/LKM-Source/rekernel.c" "$DRIVER_DIR/"
+        cp "$TMP_DIR/Re-Kernel/LKM-Source/rekernel.h" "$DRIVER_DIR/"
+        rm -rf "$TMP_DIR"
+
+        cat > "$DRIVER_DIR/Kconfig" << 'EOF'
+        menu "Re:Kernel"
+        config REKERNEL
+            bool "Re:Kernel support (GKI Vendor Hooks)"
+            default y
+            help
+              Enable Re-Kernel support via GKI Vendor Hooks.
+
+        config REKERNEL_NETWORK
+            bool "Re:Kernel NetReceive unfreeze support"
+            depends on REKERNEL
+            default n
+        endmenu
+        EOF
+
+        cat > "$DRIVER_DIR/Makefile" << 'EOF'
+        obj-$(CONFIG_REKERNEL) += rekernel.o
+        ccflags-$(CONFIG_REKERNEL_NETWORK) += -DNETWORK_FILTER
+        EOF
+
+        cd "$COMMON_DIR"
+
+        if [ ! -f drivers/Kconfig ]; then
+          echo "::error::drivers/Kconfig not found under $COMMON_DIR"
+          exit 1
+        fi
+        if ! grep -qF 'source "drivers/rekernel/Kconfig"' drivers/Kconfig; then
+          sed -i '/^endmenu$/i source "drivers/rekernel/Kconfig"' drivers/Kconfig
+        fi
+
+        if [ ! -f drivers/Makefile ]; then
+          echo "::error::drivers/Makefile not found under $COMMON_DIR"
+          exit 1
+        fi
+        if ! grep -qF 'obj-$(CONFIG_REKERNEL) += rekernel/' drivers/Makefile; then
+          echo 'obj-$(CONFIG_REKERNEL) += rekernel/' >> drivers/Makefile
+        fi
+
+        VERSION_MACRO="KERNEL_$(echo "${{ inputs.kernel_version }}" | tr '.' '_')"
+        REKERNEL_H="$DRIVER_DIR/rekernel.h"
+        if grep -q "^// #define ${VERSION_MACRO}$" "$REKERNEL_H"; then
+          sed -i "s|^// #define ${VERSION_MACRO}$|#define ${VERSION_MACRO}|" "$REKERNEL_H"
+        else
+          echo "::warning::Re-Kernel: version macro ${VERSION_MACRO} not found in rekernel.h as a commented-out default; check upstream layout."
+        fi
+
+        sed -i 's|#include <../android/binder_internal.h>|#include "../../drivers/android/binder_internal.h"|g' "$DRIVER_DIR/rekernel.c"
+        if ! grep -qF '#include <linux/seq_file.h>' "$DRIVER_DIR/rekernel.c"; then
+          sed -i '/#include <trace\/hooks\/signal.h>/a #include <linux/seq_file.h>' "$DRIVER_DIR/rekernel.c"
+        fi
+
+        echo "== Re-Kernel Kconfig/Makefile wiring =="
+        grep -n 'rekernel' drivers/Kconfig drivers/Makefile
