@@ -90,6 +90,12 @@ on:
         required: true
         options: ["on", "off"]
         default: "off"
+      add_nomount_maxsteeel:
+        description: "NoMount support (On:maxsteeel-nomount, Off:mirahsyakilla-nomount)"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
       baseband_guard:
         type: choice
         required: true
@@ -119,12 +125,6 @@ on:
         default: "off"
       re_kernel:
         description: "启用 Re-Kernel 驱动"
-        type: choice
-        required: true
-        options: ["off", "on"]
-        default: "off"
-      add_nomount_maxsteeel:
-        description: "Add NoMount support (maxsteeel/nomount, manager-agnostic)"
         type: choice
         required: true
         options: ["off", "on"]
@@ -320,6 +320,12 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
 
+      - name: Apply NoMount support (maxsteeel)
+        if: inputs.add_nomount_maxsteeel == 'on'
+        uses: ./.github/actions/apply-nomount
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
       - name: Apply Baseband Guard
         if: inputs.baseband_guard == 'on'
         uses: ./.github/actions/apply-baseband-guard
@@ -343,12 +349,6 @@ jobs:
       - name: Apply Re-Kernel driver
         if: inputs.re_kernel == 'on'
         uses: ./.github/actions/apply-re-kernel
-        with:
-          kernel_version: ${{ inputs.kernel_version }}
-
-      - name: Apply NoMount support (maxsteeel)
-        if: inputs.add_nomount_maxsteeel == 'on'
-        uses: ./.github/actions/apply-nomount
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
