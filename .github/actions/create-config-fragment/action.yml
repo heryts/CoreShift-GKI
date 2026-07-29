@@ -4,6 +4,22 @@ inputs:
   manager:
     required: true
     description: Selected manager, used to select SUSFS Kconfig symbol source.
+  custom_version_name:
+    required: false
+    default: ""
+    description: Custom kernel version/localversion string.
+  droidspaces:
+    required: false
+    default: "off"
+    description: Droidspaces slot selection (off/678/123/345), used to enable required container configs.
+  droidspaces_ntsync:
+    required: false
+    default: "off"
+    description: Enable NTSync-related Kconfig for Droidspaces containers.
+  re_kernel:
+    required: false
+    default: "off"
+    description: Enable Re-Kernel driver Kconfig.
   ikconfig:
     required: true
     description: Enable IKCONFIG.
@@ -245,6 +261,30 @@ runs:
 
         if [ "${{ inputs.baseband_guard }}" = "on" ]; then
           add_config BBG y
+        fi
+
+        if [ "${{ inputs.droidspaces }}" != "off" ]; then
+          echo "== Droidspaces config: enabling container primitives =="
+          add_config SYSVIPC y
+          add_config POSIX_MQUEUE y
+          add_config IPC_NS y
+          add_config PID_NS y
+          add_config DEVTMPFS y
+        fi
+
+        if [ "${{ inputs.droidspaces_ntsync }}" = "on" ]; then
+          echo "== NTSync config =="
+          add_config NTSYNC y
+        fi
+
+        if [ "${{ inputs.re_kernel }}" = "on" ]; then
+          echo "== Re-Kernel config =="
+          add_config REKERNEL y
+        fi
+
+        if [ -n "${{ inputs.custom_version_name }}" ]; then
+          echo "== custom version name =="
+          add_str_config LOCALVERSION "${{ inputs.custom_version_name }}"
         fi
 
         if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
