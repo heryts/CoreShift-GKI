@@ -344,7 +344,6 @@ jobs:
         uses: ./.github/actions/create-config-fragment
         with:
           manager: ${{ inputs.manager }}
-          custom_version_name: ${{ inputs.custom_version_name }}
           droidspaces: ${{ inputs.droidspaces }}
           droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
           re_kernel: ${{ inputs.re_kernel }}
