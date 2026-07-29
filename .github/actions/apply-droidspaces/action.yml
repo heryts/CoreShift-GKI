@@ -1,0 +1,88 @@
+name: Apply Droidspaces support
+description: Apply Droidspaces kABI compatibility patches for container support.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version being patched.
+  droidspaces:
+    required: true
+    description: Droidspaces slot selection (off, 678, 123, 345).
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ "${{ inputs.droidspaces }}" = "off" ]; then
+          echo "Droidspaces support off."
+          exit 0
+        fi
+
+        COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+        SLOT="${{ inputs.droidspaces }}"
+        SLOT_NAME="$(echo "$SLOT" | sed 's/\(.\)/\1_/g; s/_$//')"
+
+        echo "== Droidspaces support (kernel_version=${{ inputs.kernel_version }}, slot=$SLOT/$SLOT_NAME) =="
+
+        TMP_DIR="$(mktemp -d)"
+        git clone --depth 1 https://github.com/ravindu644/Droidspaces-OSS.git "$TMP_DIR/Droidspaces-OSS"
+        PATCH_ROOT="$TMP_DIR/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI"
+
+        case "${{ inputs.kernel_version }}" in
+          5.10|6.1|6.6)
+            PATCH_FILE="$PATCH_ROOT/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_${SLOT_NAME}.patch"
+            ;;
+          6.12)
+            PATCH_FILE="$PATCH_ROOT/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch"
+            ;;
+          *)
+            echo "::error::Droidspaces: unsupported kernel_version=${{ inputs.kernel_version }}"
+            exit 1
+            ;;
+        esac
+
+        if [ ! -f "$PATCH_FILE" ]; then
+          echo "::error::Droidspaces patch not found: $PATCH_FILE"
+          exit 1
+        fi
+
+        cd "$COMMON_DIR"
+
+        echo "== apply SYSVIPC kABI patch =="
+        if patch -p1 --forward --dry-run < "$PATCH_FILE" >/dev/null 2>&1; then
+          patch -p1 --forward < "$PATCH_FILE"
+        else
+          echo "::warning::SYSVIPC kABI patch did not apply cleanly; it may already be applied or the source context has changed."
+        fi
+
+        if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+          POSIX_PATCH="$PATCH_ROOT/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch"
+          if [ ! -f "$POSIX_PATCH" ]; then
+            echo "::error::Droidspaces patch not found: $POSIX_PATCH"
+            exit 1
+          fi
+          echo "== apply POSIX_MQUEUE kABI patch (5.10) =="
+          if patch -p1 --forward --dry-run < "$POSIX_PATCH" >/dev/null 2>&1; then
+            patch -p1 --forward < "$POSIX_PATCH"
+          else
+            echo "::warning::POSIX_MQUEUE kABI patch did not apply cleanly; it may already be applied or the source context has changed."
+          fi
+        fi
+
+        if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+          echo "== export init_ipc_ns / put_ipc_ns for rust_binder (6.12) =="
+          if [ -f "ipc/msgutil.c" ] && ! grep -qF 'EXPORT_SYMBOL(init_ipc_ns);' "ipc/msgutil.c"; then
+            sed -i '/^struct msg_msgseg {/i EXPORT_SYMBOL(init_ipc_ns);' "ipc/msgutil.c"
+            echo "exported init_ipc_ns"
+          fi
+          if [ -f "ipc/namespace.c" ] && ! grep -qF 'EXPORT_SYMBOL(put_ipc_ns);' "ipc/namespace.c"; then
+            sed -i '/^static struct ns_common \*ipcns_get(/i EXPORT_SYMBOL(put_ipc_ns);' "ipc/namespace.c"
+            echo "exported put_ipc_ns"
+          fi
+        fi
+
+        rm -rf "$TMP_DIR"
+
+        echo "== Droidspaces diff stat =="
+        git diff --stat -- ipc fs || true
