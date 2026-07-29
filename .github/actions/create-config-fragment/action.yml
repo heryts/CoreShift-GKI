@@ -265,11 +265,13 @@ runs:
 
         if [ "${{ inputs.droidspaces }}" != "off" ]; then
           echo "== Droidspaces config: enabling container primitives =="
-          add_config SYSVIPC y
-          add_config POSIX_MQUEUE y
-          add_config IPC_NS y
-          add_config PID_NS y
-          add_config DEVTMPFS y
+          for cfg in SYSVIPC POSIX_MQUEUE IPC_NS PID_NS DEVTMPFS; do
+            if grep -qxF "CONFIG_${cfg}=y" private.fragment 2>/dev/null; then
+              echo "  already requested via container_features: CONFIG_${cfg}"
+            else
+              add_config "$cfg" y
+            fi
+          done
         fi
 
         if [ "${{ inputs.droidspaces_ntsync }}" = "on" ]; then
