@@ -123,6 +123,12 @@ on:
         required: true
         options: ["off", "on"]
         default: "off"
+      add_nomount_maxsteeel:
+        description: "Add NoMount support (maxsteeel/nomount, manager-agnostic)"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
       publish_mode:
         type: choice
         required: true
@@ -340,10 +346,17 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Apply NoMount support (maxsteeel)
+        if: inputs.add_nomount_maxsteeel == 'on'
+        uses: ./.github/actions/apply-nomount
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
           manager: ${{ inputs.manager }}
+          add_nomount_maxsteeel: ${{ inputs.add_nomount_maxsteeel }}
           droidspaces: ${{ inputs.droidspaces }}
           droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
           re_kernel: ${{ inputs.re_kernel }}
