@@ -92,6 +92,14 @@ runs:
               SELECTED_MANAGER_REF=""
               MANAGER_REF_SOURCE="susfs-default (KSUN susfs+nomount-hookless branch)"
               ;;
+            ResukiSU:*|Wild_KSU:*|Rissu:*)
+              # No known-good pinned commit for this manager yet. Fall back to
+              # whatever commit .gitmodules/submodule update already checked
+              # out, instead of hard-failing. This is picked up by the
+              # "Critical fix" block below (uses submodule HEAD as setup ref).
+              SELECTED_MANAGER_REF=""
+              MANAGER_REF_SOURCE="submodule-default (no known SUSFS-pinned commit)"
+              ;;
             *)
               echo "::error::No SUSFS-compatible default manager ref for manager=${MANAGER}, kernel_version=${KERNEL_VERSION}. Set manager_ref explicitly."
               exit 1
@@ -129,7 +137,7 @@ runs:
         # Critical fix:
         # If no explicit/SUSFS ref was selected, pass the actual submodule HEAD
         # into KernelSU/KowSU setup.sh instead of letting setup.sh use its own default.
-        if [ -z "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; }; then
+        if [ -z "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "ResukiSU" ] || [ "$MANAGER" = "Wild_KSU" ] || [ "$MANAGER" = "Rissu" ]; }; then
           SELECTED_MANAGER_REF="$MANAGER_HEAD"
           MANAGER_REF_SOURCE="submodule-head"
           echo "using submodule HEAD as setup ref: $SELECTED_MANAGER_REF"
