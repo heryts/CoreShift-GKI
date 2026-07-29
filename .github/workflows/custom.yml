@@ -105,6 +105,32 @@ on:
         required: true
         options: ["on", "off"]
         default: "on"
+      custom_version_name:
+        description: "Custom version name (optional)"
+        required: false
+        default: ""
+      custom_build_time:
+        description: "Custom build time (blank = current UTC)"
+        required: false
+        default: ""
+      droidspaces:
+        description: "Droidspaces support (5.10~6.6: slot patch, 6.12: on/off)"
+        type: choice
+        required: true
+        options: ["off", "678", "123", "345"]
+        default: "off"
+      droidspaces_ntsync:
+        description: "NTSync support for Droidspaces containers"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
+      re_kernel:
+        description: "启用 Re-Kernel 驱动"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
       publish_mode:
         type: choice
         required: true
@@ -137,6 +163,11 @@ jobs:
 
           if [ "${{ inputs.source_mode }}" = "pixel" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
             echo "::error::source_mode=pixel currently supports Pixel 6+ 6.1 branches only; choose kernel_version=6.1"
+            exit 1
+          fi
+
+          if [ "${{ inputs.droidspaces_ntsync }}" = "on" ] && [ "${{ inputs.droidspaces }}" = "off" ]; then
+            echo "::error::droidspaces_ntsync=on requires droidspaces to be enabled (not 'off')"
             exit 1
           fi
 
@@ -298,10 +329,33 @@ jobs:
           baseband_guard: ${{ inputs.baseband_guard }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Apply Droidspaces support
+        if: inputs.droidspaces != 'off'
+        uses: ./.github/actions/apply-droidspaces
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          droidspaces: ${{ inputs.droidspaces }}
+
+      - name: Apply NTSync support
+        if: inputs.droidspaces != 'off' && inputs.droidspaces_ntsync == 'on'
+        uses: ./.github/actions/apply-ntsync
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
+      - name: Apply Re-Kernel driver
+        if: inputs.re_kernel == 'on'
+        uses: ./.github/actions/apply-re-kernel
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
           manager: ${{ inputs.manager }}
+          custom_version_name: ${{ inputs.custom_version_name }}
+          droidspaces: ${{ inputs.droidspaces }}
+          droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
+          re_kernel: ${{ inputs.re_kernel }}
           ikconfig: ${{ inputs.ikconfig }}
           container_core: ${{ inputs.container_features }}
           container_ipc: ${{ inputs.container_features }}
@@ -349,6 +403,14 @@ jobs:
 
       - name: Commit kernel changes
         uses: ./.github/actions/commit-kernel-changes
+
+      - name: Set custom build time
+        if: inputs.custom_build_time != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "KBUILD_BUILD_TIMESTAMP=${{ inputs.custom_build_time }}" >> "$GITHUB_ENV"
+          echo "using custom build time: ${{ inputs.custom_build_time }}"
 
       - name: Build kernel
         uses: ./.github/actions/build-kernel
