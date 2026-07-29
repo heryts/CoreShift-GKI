@@ -214,7 +214,13 @@ runs:
             add_config KRETPROBES y
             add_config KALLSYMS y
             add_config KSU_KPROBES_SUSFS y
-            add_config KSU_KPROBES_NOMOUNT y
+            if [ "${{ inputs.add_nomount_maxsteeel }}" = "on" ]; then
+              echo "add_nomount_maxsteeel=on: standalone NoMount (maxsteeel/nomount) takes"
+              echo "precedence; skipping fork's built-in KSU_KPROBES_NOMOUNT to avoid"
+              echo "two independent NoMount implementations hooking the VFS layer at once."
+            else
+              add_config KSU_KPROBES_NOMOUNT y
+            fi
             echo "Enabling ARM64 branch-link hook mode (KSU_HACK_ARM64_BRANCH_LINK)."
             echo "This is opt-in (default n) but is what the fork's SUSFS help text"
             echo "describes as the intended hook path for kstat/mount tracking."
