@@ -4,10 +4,6 @@ inputs:
   manager:
     required: true
     description: Selected manager, used to select SUSFS Kconfig symbol source.
-  custom_version_name:
-    required: false
-    default: ""
-    description: Custom kernel version/localversion string.
   droidspaces:
     required: false
     default: "off"
@@ -282,11 +278,6 @@ runs:
         if [ "${{ inputs.re_kernel }}" = "on" ]; then
           echo "== Re-Kernel config =="
           add_config REKERNEL y
-        fi
-
-        if [ -n "${{ inputs.custom_version_name }}" ]; then
-          echo "== custom version name =="
-          add_str_config LOCALVERSION "${{ inputs.custom_version_name }}"
         fi
 
         if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
