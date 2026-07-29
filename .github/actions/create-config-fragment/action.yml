@@ -225,6 +225,18 @@ runs:
             echo "This is opt-in (default n) but is what the fork's SUSFS help text"
             echo "describes as the intended hook path for kstat/mount tracking."
             add_config KSU_HACK_ARM64_BRANCH_LINK y
+          elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
+            echo "== SUSFS config: ResukiSU (built-in SUSFS, generic symbol names) =="
+            add_config KSU_SUSFS y
+            add_config KSU_SUSFS_SUS_PATH y
+            add_config KSU_SUSFS_SUS_MOUNT y
+            add_config KSU_SUSFS_SUS_KSTAT y
+            add_config KSU_SUSFS_SPOOF_UNAME y
+            add_config KSU_SUSFS_ENABLE_LOG y
+            add_config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS y
+            add_config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
+            add_config KSU_SUSFS_OPEN_REDIRECT y
+            add_config KSU_SUSFS_SUS_MAP y
           else
             case "${{ inputs.kernel_version }}" in
               5.10)
