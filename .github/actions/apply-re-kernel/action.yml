@@ -1,9 +1,10 @@
 name: Apply Re-Kernel driver
-description: Vendor and enable the Re-Kernel GKI Vendor Hooks driver.
+description: Vendor Re-Kernel (Sakion-Team/Re-Kernel, LKM-Source) as a built-in driver instead of an out-of-tree module.
 inputs:
   kernel_version:
-    required: true
-    description: Kernel version being patched, used to enable the matching Re-Kernel version macro.
+    required: false
+    default: ""
+    description: Kernel version being patched (currently informational only).
 runs:
   using: composite
   steps:
@@ -12,36 +13,42 @@ runs:
         set -euo pipefail
 
         COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+        DRIVER_DIR="$COMMON_DIR/drivers/rekernel"
 
-        echo "== Re-Kernel driver =="
+        echo "== Re-Kernel driver (built-in) =="
         TMP_DIR="$(mktemp -d)"
         git clone --depth 1 https://github.com/Sakion-Team/Re-Kernel.git "$TMP_DIR/Re-Kernel"
 
-        DRIVER_DIR="$COMMON_DIR/drivers/rekernel"
+        SRC_DIR="$TMP_DIR/Re-Kernel/LKM-Source"
+        for required in Kconfig Makefile rekernel.h rekernel_internal.h \
+          rekernel_main.c rekernel_binder.c rekernel_netfilter.c \
+          rekernel_netlink.c rekernel_signal.c; do
+          if [ ! -f "$SRC_DIR/$required" ]; then
+            echo "::error::missing Re-Kernel source file: $SRC_DIR/$required"
+            rm -rf "$TMP_DIR"
+            exit 1
+          fi
+        done
+
+        rm -rf "$DRIVER_DIR"
         mkdir -p "$DRIVER_DIR"
-        cp "$TMP_DIR/Re-Kernel/LKM-Source/rekernel.c" "$DRIVER_DIR/"
-        cp "$TMP_DIR/Re-Kernel/LKM-Source/rekernel.h" "$DRIVER_DIR/"
+        cp "$SRC_DIR"/*.c "$SRC_DIR"/*.h "$SRC_DIR/Kconfig" "$SRC_DIR/Makefile" "$DRIVER_DIR/"
         rm -rf "$TMP_DIR"
 
-        cat > "$DRIVER_DIR/Kconfig" << 'EOF'
-        menu "Re:Kernel"
-        config REKERNEL
-            bool "Re:Kernel support (GKI Vendor Hooks)"
-            default y
-            help
-              Enable Re-Kernel support via GKI Vendor Hooks.
+        echo "== upstream Makefile (obj-m, out-of-tree) =="
+        cat "$DRIVER_DIR/Makefile"
 
-        config REKERNEL_NETWORK
-            bool "Re:Kernel NetReceive unfreeze support"
-            depends on REKERNEL
-            default n
-        endmenu
-        EOF
+        echo
+        echo "== patch Makefile: obj-m -> obj-\$(CONFIG_REKERNEL), built-in =="
+        if ! grep -qE '^obj-m[[:space:]]*:=[[:space:]]*rekernel\.o' "$DRIVER_DIR/Makefile"; then
+          echo "::error::Re-Kernel Makefile format changed upstream; expected 'obj-m := rekernel.o' as the first assignment. Update this action's sed pattern to match the new Makefile."
+          exit 1
+        fi
+        sed -i 's/^obj-m[[:space:]]*:=[[:space:]]*rekernel\.o/obj-$(CONFIG_REKERNEL) += rekernel.o/' "$DRIVER_DIR/Makefile"
 
-        cat > "$DRIVER_DIR/Makefile" << 'EOF'
-        obj-$(CONFIG_REKERNEL) += rekernel.o
-        ccflags-$(CONFIG_REKERNEL_NETWORK) += -DNETWORK_FILTER
-        EOF
+        echo
+        echo "== patched Makefile =="
+        cat "$DRIVER_DIR/Makefile"
 
         cd "$COMMON_DIR"
 
@@ -61,18 +68,6 @@ runs:
           echo 'obj-$(CONFIG_REKERNEL) += rekernel/' >> drivers/Makefile
         fi
 
-        VERSION_MACRO="KERNEL_$(echo "${{ inputs.kernel_version }}" | tr '.' '_')"
-        REKERNEL_H="$DRIVER_DIR/rekernel.h"
-        if grep -q "^// #define ${VERSION_MACRO}$" "$REKERNEL_H"; then
-          sed -i "s|^// #define ${VERSION_MACRO}$|#define ${VERSION_MACRO}|" "$REKERNEL_H"
-        else
-          echo "::warning::Re-Kernel: version macro ${VERSION_MACRO} not found in rekernel.h as a commented-out default; check upstream layout."
-        fi
-
-        sed -i 's|#include <../android/binder_internal.h>|#include "../../drivers/android/binder_internal.h"|g' "$DRIVER_DIR/rekernel.c"
-        if ! grep -qF '#include <linux/seq_file.h>' "$DRIVER_DIR/rekernel.c"; then
-          sed -i '/#include <trace\/hooks\/signal.h>/a #include <linux/seq_file.h>' "$DRIVER_DIR/rekernel.c"
-        fi
-
+        echo
         echo "== Re-Kernel Kconfig/Makefile wiring =="
         grep -n 'rekernel' drivers/Kconfig drivers/Makefile
