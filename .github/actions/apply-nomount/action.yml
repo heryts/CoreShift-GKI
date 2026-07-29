@@ -12,7 +12,7 @@ runs:
         set -euo pipefail
 
         COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
-        BASE_URL="https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/main"
+        BASE_URL="https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/experimental/hookless"
         PATCH_NAME="nomount_${{ inputs.kernel_version }}_kernel_integration.patch"
 
         echo "== NoMount (maxsteeel/nomount) =="
