@@ -91,7 +91,7 @@ on:
         options: ["on", "off"]
         default: "off"
       add_nomount_maxsteeel:
-        description: "NoMount support (On:maxsteeel-nomount, Off:mirahsyakilla-nomount)"
+        description: "NoMount_support (On:maxsteeel-nomount, Off:MirahSyakilla-nomount)"
         type: choice
         required: true
         options: ["off", "on"]
