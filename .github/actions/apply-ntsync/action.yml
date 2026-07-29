@@ -1,0 +1,61 @@
+name: Apply NTSync support
+description: Apply NTSync kernel patches and enable CONFIG_NTSYNC for Droidspaces containers.
+inputs:
+  kernel_version:
+    required: true
+    description: Kernel version being patched.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+
+        case "${{ inputs.kernel_version }}" in
+          5.10)
+            ANDROID_VERSION="android12"
+            ;;
+          6.1)
+            ANDROID_VERSION="android14"
+            ;;
+          6.6)
+            ANDROID_VERSION="android15"
+            ;;
+          6.12)
+            ANDROID_VERSION="android16"
+            ;;
+          *)
+            echo "::error::NTSync: unsupported kernel_version=${{ inputs.kernel_version }}"
+            exit 1
+            ;;
+        esac
+
+        NTSYNC_PATCH="ntsync_compat_${ANDROID_VERSION}-${{ inputs.kernel_version }}"
+        echo "== NTSync support (android_version=$ANDROID_VERSION, kernel_version=${{ inputs.kernel_version }}) =="
+        echo "selected patch: ${NTSYNC_PATCH}.patch"
+
+        TMP_DIR="$(mktemp -d)"
+        BASE_URL="https://raw.githubusercontent.com/Goldzxcbug/Droidspaces_Kernel_patch/refs/heads/main/NTsync"
+
+        curl -LSs "$BASE_URL/ntsync_base.patch" -o "$TMP_DIR/ntsync_base.patch"
+        curl -LSs "$BASE_URL/${NTSYNC_PATCH}.patch" -o "$TMP_DIR/${NTSYNC_PATCH}.patch"
+
+        if [ ! -s "$TMP_DIR/ntsync_base.patch" ] || [ ! -s "$TMP_DIR/${NTSYNC_PATCH}.patch" ]; then
+          echo "::error::NTSync patch download failed or empty for android_version=$ANDROID_VERSION, kernel_version=${{ inputs.kernel_version }}"
+          exit 1
+        fi
+
+        cd "$COMMON_DIR"
+
+        echo "== apply ntsync_base.patch =="
+        patch -p1 --forward < "$TMP_DIR/ntsync_base.patch"
+
+        echo "== apply ${NTSYNC_PATCH}.patch =="
+        patch -p1 --forward < "$TMP_DIR/${NTSYNC_PATCH}.patch"
+
+        rm -rf "$TMP_DIR"
+
+        echo "== NTSync diff stat =="
+        git diff --stat || true
