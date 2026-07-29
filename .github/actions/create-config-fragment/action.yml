@@ -227,6 +227,12 @@ runs:
             add_config KSU_HACK_ARM64_BRANCH_LINK y
           elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
             echo "== SUSFS config: ResukiSU (built-in SUSFS, generic symbol names) =="
+            echo "Also enabling KPROBES/KRETPROBES/KALLSYMS to select kprobes-based"
+            echo "hook mode instead of manual hook (which requires kernel source"
+            echo "patches ResukiSU's setup.sh does not apply to stock GKI source)."
+            add_config KPROBES y
+            add_config KRETPROBES y
+            add_config KALLSYMS y
             add_config KSU_SUSFS y
             add_config KSU_SUSFS_SUS_PATH y
             add_config KSU_SUSFS_SUS_MOUNT y
