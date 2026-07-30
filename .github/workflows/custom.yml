@@ -312,13 +312,7 @@ jobs:
           manager_ref: ${{ inputs.manager_ref }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
-
-      - name: DEBUG dump reboot.c faccessat with cat -n
-        shell: bash
-        run: |
-          REBOOT_C="$GITHUB_WORKSPACE/kernel/reboot.c"
-          cat -n kernel/reboot.c | sed -n '270,300p'
-          
+            
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
         uses: ./.github/actions/apply-resukisu-hooks
