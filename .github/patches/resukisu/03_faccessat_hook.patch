@@ -1,7 +1,7 @@
 --- a/fs/open.c
 +++ b/fs/open.c
-@@ -450,7 +450,16 @@ long do_faccessat(int dfd, const char __user *filename, int mode)
- 	return res;
+@@ -395,7 +395,13 @@ static const struct cred *access_override_creds(void)
+ 	return old_cred;
  }
  
 +#ifdef CONFIG_KSU_MANUAL_HOOK
@@ -10,10 +10,17 @@
 +				int *mode, int *flags);
 +#endif
 +
+ static long do_faccessat(int dfd, const char __user *filename, int mode, int flags)
+ {
+ 	struct path path;
+@@ -467,8 +473,12 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int f
+ 	return res;
+ }
+ 
  SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
  {
 +#ifdef CONFIG_KSU_MANUAL_HOOK
 +	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
 +#endif
- 	return do_faccessat(dfd, filename, mode);
+ 	return do_faccessat(dfd, filename, mode, 0);
  }
