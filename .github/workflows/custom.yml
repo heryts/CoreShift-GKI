@@ -334,6 +334,13 @@ jobs:
           grep -n "do_execve\|do_execveat_common\|compat_do_execve" "$EXEC_C" | head -50
           echo "=== lines 1860-1940 ==="
           sed -n '1860,1940p' "$EXEC_C"
+
+      - name: DEBUG dump exec.c do_execve region
+        shell: bash
+        run: |
+          EXEC_C="$GITHUB_WORKSPACE/kernel/common/fs/exec.c"
+          echo "=== lines 1995-2065 ==="
+          sed -n '1995,2065p' "$EXEC_C"
           
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
