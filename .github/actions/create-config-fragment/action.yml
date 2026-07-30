@@ -230,19 +230,12 @@ runs:
             echo "Also enabling KPROBES/KRETPROBES/KALLSYMS to select kprobes-based"
             echo "hook mode instead of manual hook (which requires kernel source"
             echo "patches ResukiSU's setup.sh does not apply to stock GKI source)."
-            add_config KPROBES y
-            add_config KRETPROBES y
-            add_config KALLSYMS y
-            add_config KSU_SUSFS y
-            add_config KSU_SUSFS_SUS_PATH y
-            add_config KSU_SUSFS_SUS_MOUNT y
-            add_config KSU_SUSFS_SUS_KSTAT y
-            add_config KSU_SUSFS_SPOOF_UNAME y
-            add_config KSU_SUSFS_ENABLE_LOG y
-            add_config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS y
-            add_config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
-            add_config KSU_SUSFS_OPEN_REDIRECT y
-            add_config KSU_SUSFS_SUS_MAP y
+            add_config KSU=y
+            add_config MANUAL_HOOK=y
+            add_config MANUAL_HOOK_AUTO_SETUID_HOOK=y
+            add_config MANUAL_HOOK_AUTO_INPUT_HOOK=y
+            add_config MANUAL_HOOK_AUTO_INITRC_HOOK=y
+            add_config KALLSYMS_ALL=y
           else
             case "${{ inputs.kernel_version }}" in
               5.10)
