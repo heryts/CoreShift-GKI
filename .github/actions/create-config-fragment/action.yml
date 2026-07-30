@@ -232,10 +232,10 @@ runs:
             echo "kernel version, while stat/execve/faccessat/sys_reboot hooks are"
             echo "supplied via the apply-resukisu-hooks source patches."
             add_config KSU y
-            add_config MANUAL_HOOK y
-            add_config MANUAL_HOOK_AUTO_SETUID_HOOK y
-            add_config MANUAL_HOOK_AUTO_INPUT_HOOK y
-            add_config MANUAL_HOOK_AUTO_INITRC_HOOK y
+            add_config KSU_MANUAL_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_SETUID_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_INPUT_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_INITRC_HOOK y
             add_config KALLSYMS_ALL y
           else
             case "${{ inputs.kernel_version }}" in
