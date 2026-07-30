@@ -1,5 +1,5 @@
 name: Apply ReSukiSU manual hooks
-description: Apply ReSukiSU's required manual kernel hooks (stat, execve, faccessat, sys_reboot) and enable auto-hook config flags.
+description: Apply ReSukiSU's required manual kernel hooks (stat, execve, faccessat, sys_reboot) as source patches. Kconfig flags are handled separately via private.fragment in create-config-fragment.
 inputs:
   kernel_version:
     required: true
@@ -16,7 +16,10 @@ runs:
 
         cd "$COMMON_DIR"
 
-        echo "== applying ReSukiSU manual hooks =="
+        echo "== applying ReSukiSU manual hooks (source patches only) =="
+        echo "Kconfig flags (CONFIG_KSU_MANUAL_HOOK, AUTO_SETUID_HOOK, etc.)"
+        echo "are applied later via private.fragment in create-config-fragment,"
+        echo "not here, to avoid touching gki_defconfig directly."
 
         apply_patch() {
           local patch_file="$1"
@@ -55,33 +58,6 @@ runs:
             exit 1
           fi
         done
-
-        echo "== enabling ReSukiSU manual-hook config flags =="
-
-        DEFCONFIG="arch/arm64/configs/gki_defconfig"
-        if [ ! -f "$DEFCONFIG" ]; then
-          echo "::error::gki_defconfig not found at $DEFCONFIG"
-          exit 1
-        fi
-
-        add_config() {
-          local cfg="$1"
-          if grep -q "^${cfg}=y" "$DEFCONFIG"; then
-            echo "  already set: $cfg"
-          elif grep -q "^# ${cfg} is not set" "$DEFCONFIG"; then
-            sed -i "s/^# ${cfg} is not set$/${cfg}=y/" "$DEFCONFIG"
-            echo "  toggled on: $cfg"
-          else
-            echo "${cfg}=y" >> "$DEFCONFIG"
-            echo "  appended: $cfg"
-          fi
-        }
-
-        add_config CONFIG_KSU_MANUAL_HOOK
-        add_config CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK
-        add_config CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK
-        add_config CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK
-        add_config CONFIG_KALLSYMS_ALL
 
         echo "== ReSukiSU manual hook integration diff stat =="
         git diff --stat
