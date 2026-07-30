@@ -313,11 +313,11 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: DEBUG dump open.c faccessat with line numbers
+      - name: DEBUG dump open.c faccessat with cat -n
         shell: bash
         run: |
           OPEN_C="$GITHUB_WORKSPACE/kernel/common/fs/open.c"
-          cat -n "$OPEN_C" | sed -n '390,485p'
+          cat -n "$OPEN_C" | sed -n '388,480p'
           
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
