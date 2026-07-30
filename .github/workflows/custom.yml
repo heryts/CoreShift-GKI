@@ -314,7 +314,7 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply SUSFS4KSU patches
-        if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next' && inputs.manager != 'ResukiSU'
+        if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
         uses: ./.github/actions/apply-susfs
         with:
           kernel_version: ${{ inputs.kernel_version }}
