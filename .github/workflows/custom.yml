@@ -313,6 +313,28 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: DEBUG dump exec.c context
+        shell: bash
+        run: |
+          set -x
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "KERNEL_COMMON_DIR=${KERNEL_COMMON_DIR:-<unset>}"
+          echo "== searching for exec.c =="
+          find "$GITHUB_WORKSPACE" -maxdepth 8 -path '*/fs/exec.c' -print
+
+          EXEC_C="$(find "$GITHUB_WORKSPACE" -maxdepth 8 -path '*/fs/exec.c' -print -quit)"
+          if [ -z "$EXEC_C" ]; then
+            echo "::error::fs/exec.c not found anywhere under $GITHUB_WORKSPACE at this point in the workflow"
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type d -print
+            exit 1
+          fi
+
+          echo "Found: $EXEC_C"
+          echo "=== do_execve context ==="
+          grep -n "do_execve\|do_execveat_common\|compat_do_execve" "$EXEC_C" | head -50
+          echo "=== lines 1860-1940 ==="
+          sed -n '1860,1940p' "$EXEC_C"
+          
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
         uses: ./.github/actions/apply-resukisu-hooks
