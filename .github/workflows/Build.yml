@@ -257,6 +257,12 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Apply ReSukiSU manual hooks
+        if: inputs.manager == 'ResukiSU'
+        uses: ./.github/actions/apply-resukisu-hooks
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
         uses: ./.github/actions/apply-susfs
