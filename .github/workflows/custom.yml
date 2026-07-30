@@ -318,6 +318,12 @@ jobs:
         run: |
           OPEN_C="$GITHUB_WORKSPACE/kernel/common/fs/open.c"
           grep -n "do_faccessat\|SYSCALL_DEFINE3(faccessat" "$OPEN_C"
+
+      - name: DEBUG dump exec.c with line numbers
+        shell: bash
+        run: |
+          EXEC_C="$GITHUB_WORKSPACE/kernel/common/fs/exec.c"
+          cat -n "$EXEC_C" | sed -n '1995,2025p'
           
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
