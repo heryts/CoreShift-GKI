@@ -19,7 +19,7 @@
 +#endif
  	return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);
  }
-@@ -2043,6 +2051,9 @@ static int compat_do_execve(struct filename *filename,
+@@ -2044,5 +2052,8 @@ static int compat_do_execve(struct filename *filename,
  		.is_compat = true,
  		.ptr.compat = __envp,
  	};
