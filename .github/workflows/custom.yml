@@ -338,6 +338,13 @@ jobs:
           echo "== is KernelSU driver symlinked into drivers/? =="
           find "$COMMON_DIR/drivers" -maxdepth 1 -iname "*kernelsu*" -o -iname "*ksu*" 2>/dev/null
           ls -la "$COMMON_DIR/drivers/kernelsu" 2>/dev/null || echo "drivers/kernelsu not present"
+
+      - name: DEBUG dump backslashxx Kconfig
+        shell: bash
+        run: |
+          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          echo "== full Kconfig content =="
+          cat "$COMMON_DIR/KernelSU/kernel/Kconfig"
           
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
