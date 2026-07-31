@@ -312,13 +312,7 @@ jobs:
           manager_ref: ${{ inputs.manager_ref }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
-            
-      - name: Apply ReSukiSU manual hooks
-        if: inputs.manager == 'ResukiSU'
-        uses: ./.github/actions/apply-resukisu-hooks
-        with:
-          kernel_version: ${{ inputs.kernel_version }}
-          
+                  
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
         uses: ./.github/actions/apply-susfs
@@ -326,6 +320,12 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
 
+      - name: Apply ReSukiSU manual hooks
+        if: inputs.manager == 'ResukiSU'
+        uses: ./.github/actions/apply-resukisu-hooks
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          
       - name: Apply NoMount support (maxsteeel)
         if: inputs.add_nomount_maxsteeel == 'on'
         uses: ./.github/actions/apply-nomount
