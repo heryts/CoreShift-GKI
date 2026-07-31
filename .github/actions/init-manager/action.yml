@@ -37,7 +37,7 @@ runs:
         echo "manager_dir=$MANAGER_DIR"
         echo "common_dir=$COMMON_DIR"
 
-        git submodule update --init --depth 1 --single-branch "manager/${MANAGER}"
+        git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
 
         if [ "$MANAGER" = "KernelSU-Next" ]; then
           echo "== KernelSU-Next: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
