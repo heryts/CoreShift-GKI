@@ -226,18 +226,21 @@ runs:
             echo "describes as the intended hook path for kstat/mount tracking."
             add_config KSU_HACK_ARM64_BRANCH_LINK y
           elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
-            echo "== SUSFS config: ResukiSU (manual hook mode) =="
-            echo "Enabling CONFIG_KSU_MANUAL_HOOK and its auto-hook variants so that"
-            echo "setresuid/input/initrc hooks apply automatically via LSM on this"
-            echo "kernel version, while stat/execve/faccessat/sys_reboot hooks are"
-            echo "supplied via the apply-resukisu-hooks source patches."
             add_config KSU y
-            add_config KSU_SUSFS y
-            add_config KSU_MANUAL_HOOK y
-            add_config KSU_MANUAL_HOOK_AUTO_SETUID_HOOK y
-            add_config KSU_MANUAL_HOOK_AUTO_INPUT_HOOK y
-            add_config KSU_MANUAL_HOOK_AUTO_INITRC_HOOK y
-            add_config KALLSYMS_ALL y
+            if [ "${{ inputs.susfs }}" = "on" ]; then
+              echo "== ResukiSU: SUSFS integration mode =="
+              echo "SUSFS patch already injects all required hook call sites"
+              echo "(stat/execve/faccessat/reboot) under CONFIG_KSU_SUSFS."
+              echo "Manual hook config/patches are intentionally NOT applied here."
+              add_config KSU_SUSFS y
+            else
+              echo "== ResukiSU: manual hook integration mode =="
+              add_config KSU_MANUAL_HOOK y
+              add_config KSU_MANUAL_HOOK_AUTO_SETUID_HOOK y
+              add_config KSU_MANUAL_HOOK_AUTO_INPUT_HOOK y
+              add_config KSU_MANUAL_HOOK_AUTO_INITRC_HOOK y
+              add_config KALLSYMS_ALL y
+            fi
           else
             case "${{ inputs.kernel_version }}" in
               5.10)
