@@ -333,7 +333,7 @@ jobs:
           cat -n "$OPEN_C" | sed -n '406,457p'
           
       - name: Apply ReSukiSU manual hooks
-        if: inputs.manager == 'ResukiSU'
+        if: inputs.manager == 'ResukiSU' && inputs.susfs == 'off'
         uses: ./.github/actions/apply-resukisu-hooks
         with:
           kernel_version: ${{ inputs.kernel_version }}
