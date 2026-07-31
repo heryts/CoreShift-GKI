@@ -320,6 +320,12 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           manager: ${{ inputs.manager }}
 
+      - name: DEBUG dump open.c post-susfs
+        shell: bash
+        run: |
+          OPEN_C="$GITHUB_WORKSPACE/kernel/common/fs/open.c"
+          cat -n "$OPEN_C" | sed -n '370,490p'
+          
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
         uses: ./.github/actions/apply-resukisu-hooks
