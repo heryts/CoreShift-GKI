@@ -1,5 +1,8 @@
 [submodule "manager/KernelSU"]
 	path = manager/KernelSU
+	url = https://github.com/tiann/KernelSU.git
+[submodule "manager/KernelSU-Backslashxx"]
+	path = manager/KernelSU-Backslashxx
 	url = https://github.com/backslashxx/KernelSU.git
 	branch = master
 [submodule "manager/KernelSU-Next"]
