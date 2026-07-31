@@ -204,8 +204,8 @@ runs:
           add_config BTRFS_FS y
         fi
 
-        if [ "${{ inputs.susfs }}" = "on" ]; then
-          if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          if [ "${{ inputs.susfs }}" = "on" ]; then
             echo "== SUSFS config: KernelSU-Next (hookless/kprobes fork) =="
             echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT."
             echo "Also enabling their Kconfig dependency chain: KPROBES, KRETPROBES,"
@@ -222,79 +222,81 @@ runs:
               add_config KSU_KPROBES_NOMOUNT y
             fi
             echo "Enabling ARM64 branch-link hook mode (KSU_HACK_ARM64_BRANCH_LINK)."
-            echo "This is opt-in (default n) but is what the fork's SUSFS help text"
-            echo "describes as the intended hook path for kstat/mount tracking."
             add_config KSU_HACK_ARM64_BRANCH_LINK y
-          elif [ "${{ inputs.manager }}" = "KernelSU" ] && [ "${{ inputs.susfs }}" = "off" ]; then
-            echo "== KernelSU config: Coccinelle manual hook mode (susfs off) =="
-            add_config KSU y
-            add_config KSU_MANUAL_HOOK y
-            add_config KALLSYMS_ALL y
-          elif [ "${{ inputs.manager }}" = "KernelSU-Backslashxx" ]; then
-            echo "== KernelSU-Backslashxx config: Coccinelle manual hook mode =="
-            add_config KSU y
-            add_config KSU_MANUAL_HOOK y
-            add_config KALLSYMS_ALL y
-          elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
-            add_config KSU y
-            if [ "${{ inputs.susfs }}" = "on" ]; then
-              echo "== ResukiSU: SUSFS integration mode =="
-              echo "SUSFS patch already injects all required hook call sites"
-              echo "(stat/execve/faccessat/reboot) under CONFIG_KSU_SUSFS."
-              echo "Manual hook config/patches are intentionally NOT applied here."
-              add_config KSU_SUSFS y
-            else
-              echo "== ResukiSU: manual hook integration mode =="
-              add_config KSU_MANUAL_HOOK y
-              add_config KSU_MANUAL_HOOK_AUTO_SETUID_HOOK y
-              add_config KSU_MANUAL_HOOK_AUTO_INPUT_HOOK y
-              add_config KSU_MANUAL_HOOK_AUTO_INITRC_HOOK y
-              add_config KALLSYMS_ALL y
-            fi
-          else
-            case "${{ inputs.kernel_version }}" in
-              5.10)
-                SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
-                ;;
-              6.1)
-                SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android14-6.1"
-                ;;
-              6.6)
-                SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
-                ;;
-              6.12)
-                SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android16-6.12"
-                ;;
-              *)
-                echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
-                exit 1
-                ;;
-            esac
-
-            echo "== SUSFS config scan: $SUSFS_PATCH_DIR =="
-
-            if [ ! -d "$SUSFS_PATCH_DIR" ]; then
-              echo "::error::missing SUSFS patch directory: $SUSFS_PATCH_DIR"
-              exit 1
-            fi
-
-            SUSFS_CONFIGS="$(
-              { grep -RhoE '^\+[[:space:]]*config[[:space:]]+KSU_SUSFS[A-Z0-9_]*' "$SUSFS_PATCH_DIR" 2>/dev/null || true; } |
-              sed -E 's/^\+[[:space:]]*config[[:space:]]+//' |
-              sort -u
-            )"
-
-            if [ -z "$SUSFS_CONFIGS" ]; then
-              echo "::warning::No required SUSFS CONFIG_* names found in selected patches/Kconfig."
-            else
-              echo "$SUSFS_CONFIGS" | while read -r key; do
-                [ -z "$key" ] && continue
-                add_config "$key" y
-              done
-            fi
           fi
-        fi
 
+        elif [ "${{ inputs.manager }}" = "KernelSU" ] && [ "${{ inputs.susfs }}" = "off" ]; then
+          echo "== KernelSU config: Coccinelle manual hook mode (susfs off) =="
+          add_config KSU y
+          add_config KSU_MANUAL_HOOK y
+          add_config KALLSYMS_ALL y
+
+        elif [ "${{ inputs.manager }}" = "KernelSU-Backslashxx" ]; then
+          echo "== KernelSU-Backslashxx config: Coccinelle manual hook mode =="
+          add_config KSU y
+          add_config KSU_MANUAL_HOOK y
+          add_config KALLSYMS_ALL y
+
+        elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
+          add_config KSU y
+          if [ "${{ inputs.susfs }}" = "on" ]; then
+            echo "== ResukiSU: SUSFS integration mode =="
+            add_config KSU_SUSFS y
+          else
+            echo "== ResukiSU: manual hook integration mode =="
+            add_config KSU_MANUAL_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_SETUID_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_INPUT_HOOK y
+            add_config KSU_MANUAL_HOOK_AUTO_INITRC_HOOK y
+            add_config KALLSYMS_ALL y
+          fi
+
+        elif [ "${{ inputs.susfs }}" = "on" ]; then
+          case "${{ inputs.kernel_version }}" in
+            5.10)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
+              ;;
+            6.1)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android14-6.1"
+              ;;
+            6.6)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
+              ;;
+            6.12)
+              SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android16-6.12"
+              ;;
+            *)
+              echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
+              exit 1
+              ;;
+          esac
+
+          echo "== SUSFS config scan: $SUSFS_PATCH_DIR =="
+
+          if [ ! -d "$SUSFS_PATCH_DIR" ]; then
+            echo "::error::missing SUSFS patch directory: $SUSFS_PATCH_DIR"
+            exit 1
+          fi
+
+          SUSFS_CONFIGS="$(
+            { grep -RhoE '^\+[[:space:]]*config[[:space:]]+KSU_SUSFS[A-Z0-9_]*' "$SUSFS_PATCH_DIR" 2>/dev/null || true; } |
+            sed -E 's/^\+[[:space:]]*config[[:space:]]+//' |
+            sort -u
+          )"
+
+          if [ -z "$SUSFS_CONFIGS" ]; then
+            echo "::warning::No required SUSFS CONFIG_* names found in selected patches/Kconfig."
+          else
+            echo "$SUSFS_CONFIGS" | while read -r key; do
+              [ -z "$key" ] && continue
+              add_config "$key" y
+            done
+          fi
+
+        else
+          echo "== manager=${{ inputs.manager }}, susfs=off: no manager-specific KSU config block matched =="
+        fi
+        
         if [ "${{ inputs.baseband_guard }}" = "on" ]; then
           add_config BBG y
         fi
