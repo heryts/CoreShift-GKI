@@ -305,7 +305,7 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           
       - name: Apply KernelSU Coccinelle manual hooks
-        if: inputs.manager == 'KernelSU-Backslashxx' || (inputs.manager == 'KernelSU' && inputs.susfs == 'off')
+        if: inputs.manager == 'KernelSU' && inputs.susfs == 'off'
         uses: ./.github/actions/apply-kernelsu-coccinelle-hooks
         with:
           kernel_version: ${{ inputs.kernel_version }}
