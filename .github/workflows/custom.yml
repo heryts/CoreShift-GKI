@@ -317,6 +317,13 @@ jobs:
           manager_ref: ${{ inputs.manager_ref }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
+
+      - name: DEBUG dump KowSU Kconfig
+        shell: bash
+        run: |
+          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          echo "== full Kconfig content =="
+          cat "$COMMON_DIR/KernelSU/kernel/Kconfig" 2>/dev/null || find "$COMMON_DIR" -iname "Kconfig" -path "*kernelsu*" -exec cat {} \;
           
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
