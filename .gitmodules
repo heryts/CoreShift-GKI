@@ -1,28 +1,28 @@
 [submodule "manager/KernelSU"]
 	path = manager/KernelSU
 	url = https://github.com/tiann/KernelSU.git
-[submodule "manager/KernelSU-Backslashxx"]
-	path = manager/KernelSU-Backslashxx
-	url = https://github.com/backslashxx/KernelSU.git
-	branch = master
+	branch = main
 [submodule "manager/KernelSU-Next"]
 	path = manager/KernelSU-Next
 	url = https://github.com/heryts/KSUN.git
 	branch = susfs+nomount-hookless
-	#url = https://github.com/KernelSU-Next/KernelSU-Next.git
 [submodule "manager/KowSU"]
 	path = manager/KowSU
 	url = https://github.com/KOWX712/KernelSU.git
-[submodule "manager/ResukiSU"]
-	path = manager/ResukiSU
-	url = https://github.com/ReSukiSU/ReSukiSU.git
-[submodule "manager/Wild_KSU"]
-	path = manager/Wild_KSU
-	url = https://github.com/WildKernels/Wild_KSU.git
-[submodule "manager/Rissu"]
-	path = manager/Rissu
-	url = https://github.com/rsuntk/KernelSU.git
+	branch = master
 [submodule "manager/KernelSU-Backslashxx"]
 	path = manager/KernelSU-Backslashxx
 	url = https://github.com/backslashxx/KernelSU.git
 	branch = master
+[submodule "manager/ResukiSU"]
+	path = manager/ResukiSU
+	url = https://github.com/ReSukiSU/ReSukiSU.git
+	branch = main
+[submodule "manager/Wild_KSU"]
+	path = manager/Wild_KSU
+	url = https://github.com/WildKernels/Wild_KSU.git
+	branch = main
+[submodule "manager/Rissu"]
+	path = manager/Rissu
+	url = https://github.com/rsuntk/KernelSU.git
+	branch = main
