@@ -318,7 +318,27 @@ jobs:
           manager_ref: ${{ inputs.manager_ref }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
-                  
+
+      - name: DEBUG search KSU_MANUAL_HOOK in Kconfig
+        shell: bash
+        run: |
+          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          echo "== searching for KSU_MANUAL_HOOK config declaration =="
+          grep -RnE "config[[:space:]]+KSU_MANUAL_HOOK" "$COMMON_DIR" 2>/dev/null || echo "NOT FOUND anywhere"
+
+          echo
+          echo "== searching for any KSU-related Kconfig files =="
+          find "$COMMON_DIR" -iname "Kconfig*" -path "*kernelsu*" -o -iname "Kconfig*" -path "*ksu*" 2>/dev/null
+
+          echo
+          echo "== KernelSU-Backslashxx submodule HEAD =="
+          git -C "$GITHUB_WORKSPACE/manager/KernelSU-Backslashxx" log -1 --oneline 2>/dev/null || echo "submodule not found at expected path"
+
+          echo
+          echo "== is KernelSU driver symlinked into drivers/? =="
+          find "$COMMON_DIR/drivers" -maxdepth 1 -iname "*kernelsu*" -o -iname "*ksu*" 2>/dev/null
+          ls -la "$COMMON_DIR/drivers/kernelsu" 2>/dev/null || echo "drivers/kernelsu not present"
+          
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KernelSU-Next'
         uses: ./.github/actions/apply-susfs
