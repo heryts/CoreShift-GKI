@@ -325,6 +325,12 @@ jobs:
         run: |
           OPEN_C="$GITHUB_WORKSPACE/kernel/common/fs/open.c"
           cat -n "$OPEN_C" | sed -n '370,490p'
+
+      - name: DEBUG dump open.c faccessat gap
+        shell: bash
+        run: |
+          OPEN_C="$GITHUB_WORKSPACE/kernel/common/fs/open.c"
+          cat -n "$OPEN_C" | sed -n '406,457p'
           
       - name: Apply ReSukiSU manual hooks
         if: inputs.manager == 'ResukiSU'
