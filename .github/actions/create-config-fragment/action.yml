@@ -226,14 +226,14 @@ runs:
           fi
 
         elif [ "${{ inputs.manager }}" = "KernelSU" ] && [ "${{ inputs.susfs }}" = "off" ]; then
-          echo "== KernelSU config: Coccinelle manual hook mode (susfs off) =="
+          echo "== KernelSU config: kprobes hook mode (built-in dependency) =="
           add_config KSU y
-          add_config KSU_MANUAL_HOOK y
-          add_config KALLSYMS_ALL y
+          add_config KPROBES y
+          add_config KRETPROBES y
 
         elif [ "${{ inputs.manager }}" = "KernelSU-Backslashxx" ]; then
           echo "== KernelSU-Backslashxx config: syscall table tamper hook mode =="
-          echo "This fork has no CONFIG_KSU_MANUAL_HOOK; it uses built-in"
+          echo "No CONFIG_KSU_MANUAL_HOOK in this fork; uses built-in"
           echo "CONFIG_KSU_TAMPER_SYSCALL_TABLE (covers execve/faccessat/newfstatat/"
           echo "newfstat/reboot) instead of source-patched call sites."
           add_config KSU y
