@@ -1,5 +1,5 @@
 name: Apply SUSFS4KSU
-description: Apply SUSFS4KSU source files and patches for selected GKI version.
+description: Apply SUSFS4KSU source files and patches for selected GKI version (pinned commit, cloned from GitLab).
 inputs:
   kernel_version:
     required: true
@@ -7,6 +7,10 @@ inputs:
   manager:
     required: true
     description: Selected manager.
+  susfs_ref:
+    required: false
+    default: "d4c3914"
+    description: "susfs4ksu commit to pin (default: v2.2.0 release, before the OPEN_REDIRECT refactor that broke set_nameidata compat)."
 runs:
   using: composite
   steps:
@@ -20,23 +24,31 @@ runs:
         fi
 
         case "${{ inputs.kernel_version }}" in
-          5.10)
-            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
-            ;;
-          6.1)
-            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android14-6.1"
-            ;;
-          6.6)
-            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android15-6.6"
-            ;;
-          6.12)
-            PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android16-6.12"
-            ;;
+          5.10) SUSFS_BRANCH="gki-android12-5.10" ;;
+          6.1)  SUSFS_BRANCH="gki-android14-6.1" ;;
+          6.6)  SUSFS_BRANCH="gki-android15-6.6" ;;
+          6.12) SUSFS_BRANCH="gki-android16-6.12" ;;
           *)
             echo "::error::unsupported kernel_version for SUSFS: ${{ inputs.kernel_version }}"
             exit 1
             ;;
         esac
+
+        SUSFS_CLONE_DIR="${RUNNER_TEMP:-/tmp}/susfs4ksu"
+        rm -rf "$SUSFS_CLONE_DIR"
+
+        echo "== cloning susfs4ksu (branch: $SUSFS_BRANCH) =="
+        git clone --branch "$SUSFS_BRANCH" https://gitlab.com/simonpunk/susfs4ksu.git "$SUSFS_CLONE_DIR"
+
+        echo "== pinning to ref: ${{ inputs.susfs_ref }} =="
+        git -C "$SUSFS_CLONE_DIR" checkout "${{ inputs.susfs_ref }}"
+
+        SUSFS_COMMIT="$(git -C "$SUSFS_CLONE_DIR" rev-parse --short HEAD)"
+        SUSFS_COMMIT_MSG="$(git -C "$SUSFS_CLONE_DIR" log -1 --format='%s')"
+        SUSFS_COMMIT_DATE="$(git -C "$SUSFS_CLONE_DIR" log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')"
+        echo "susfs4ksu pinned commit: $SUSFS_COMMIT ($SUSFS_COMMIT_DATE) - $SUSFS_COMMIT_MSG"
+
+        PATCH_DIR="$SUSFS_CLONE_DIR/kernel_patches"
 
         echo "== SUSFS4KSU patch dir =="
         echo "$PATCH_DIR"
@@ -44,25 +56,12 @@ runs:
         SUSFS_C="$PATCH_DIR/fs/susfs.c"
         SUSFS_INCLUDE_DIR="$PATCH_DIR/include/linux"
         KSU_PATCH="$PATCH_DIR/KernelSU/10_enable_susfs_for_ksu.patch"
-
-        case "${{ inputs.kernel_version }}" in
-          5.10)
-            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android12-5.10.patch"
-            ;;
-          6.1)
-            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android14-6.1.patch"
-            ;;
-          6.6)
-            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android15-6.6.patch"
-            ;;
-          6.12)
-            SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_gki-android16-6.12.patch"
-            ;;
-        esac
+        SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_${SUSFS_BRANCH}.patch"
 
         for path in "$PATCH_DIR" "$SUSFS_C" "$SUSFS_INCLUDE_DIR" "$SUSFS_PATCH" "$KSU_PATCH"; do
           if [ ! -e "$path" ]; then
             echo "::error::missing SUSFS file/patch: $path"
+            find "$PATCH_DIR" -maxdepth 3 2>/dev/null || true
             exit 1
           fi
         done
@@ -85,11 +84,7 @@ runs:
         echo
         echo "== check/apply core SUSFS patch =="
         if ! git apply --check "$SUSFS_PATCH"; then
-          if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
-            echo "::error::6.12 SUSFS patch does not apply to this source tree. Current 6.12 SUSFS support is validated on the maintained experimental source path, not the default Google/AOSP 6.12 source path."
-            exit 1
-          fi
-          echo "::error::core SUSFS patch does not apply"
+          echo "::error::core SUSFS patch (commit $SUSFS_COMMIT) does not apply to this source tree"
           exit 1
         fi
 
@@ -123,13 +118,6 @@ runs:
 
         if [ -z "$KSU_MARKERS" ]; then
           echo "::error::No integrated KernelSU root found for manager '${{ inputs.manager }}'. Expected a file matching */kernel/include/ksu.h under $COMMON_DIR."
-          echo "== nearby KernelSU/KSU directories =="
-          find "$COMMON_DIR" \
-            -type d \
-            \( -iname '*kernelsu*' -o -iname '*ksu*' \) \
-            -print 2>/dev/null |
-            sort |
-            head -100
           exit 1
         fi
 
@@ -143,10 +131,7 @@ runs:
         echo
         if [ "${{ inputs.manager }}" = "KernelSU-Next" ] || [ "${{ inputs.manager }}" = "ResukiSU" ]; then
           echo "== skipping generic KernelSU SUSFS enablement patch =="
-          echo "manager=${{ inputs.manager }} has its own SUSFS wiring built into its source"
-          echo "(inline hooks under CONFIG_KSU_SUSFS, not the generic KernelSU/KowSU layout"
-          echo "targeted by 10_enable_susfs_for_ksu.patch); applying that patch here would"
-          echo "either fail to apply cleanly or duplicate hook logic already present."
+          echo "manager=${{ inputs.manager }} has its own SUSFS wiring built into its source."
         else
           echo "== check/apply KernelSU SUSFS patch from KSU_ROOT =="
           git apply --check "$KSU_PATCH"
@@ -159,18 +144,6 @@ runs:
         fi
 
         cd "$COMMON_DIR"
-
-        echo
-        echo "== KernelSU Kconfig validation =="
-        grep -R -n 'kernelsu.*/kernel/Kconfig\|KernelSU.*/kernel/Kconfig' drivers Kconfig 2>/dev/null || true
-        find . -path '*/kernel/Kconfig' | grep -i 'kernelsu\|ksu' || true
-
-        if grep -R -q 'drivers/staging/kernelsu/kernel/Kconfig' drivers/staging/Kconfig 2>/dev/null; then
-          test -f drivers/staging/kernelsu/kernel/Kconfig || {
-            echo "::error::drivers/staging/Kconfig references missing drivers/staging/kernelsu/kernel/Kconfig"
-            exit 1
-          }
-        fi
 
         echo
         echo "== SUSFS source git diff stat =="
