@@ -22,3 +22,7 @@
 [submodule "manager/Rissu"]
 	path = manager/Rissu
 	url = https://github.com/rsuntk/KernelSU.git
+[submodule "manager/KernelSU-Backslashxx"]
+	path = manager/KernelSU-Backslashxx
+	url = https://github.com/backslashxx/KernelSU.git
+	branch = master
