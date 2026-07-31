@@ -232,11 +232,14 @@ runs:
           add_config KALLSYMS_ALL y
 
         elif [ "${{ inputs.manager }}" = "KernelSU-Backslashxx" ]; then
-          echo "== KernelSU-Backslashxx config: Coccinelle manual hook mode =="
+          echo "== KernelSU-Backslashxx config: syscall table tamper hook mode =="
+          echo "This fork has no CONFIG_KSU_MANUAL_HOOK; it uses built-in"
+          echo "CONFIG_KSU_TAMPER_SYSCALL_TABLE (covers execve/faccessat/newfstatat/"
+          echo "newfstat/reboot) instead of source-patched call sites."
           add_config KSU y
-          add_config KSU_MANUAL_HOOK y
+          add_config KSU_TAMPER_SYSCALL_TABLE y
           add_config KALLSYMS_ALL y
-
+  
         elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
           add_config KSU y
           if [ "${{ inputs.susfs }}" = "on" ]; then
