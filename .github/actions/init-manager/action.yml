@@ -92,7 +92,7 @@ runs:
               SELECTED_MANAGER_REF=""
               MANAGER_REF_SOURCE="susfs-default (KSUN susfs+nomount-hookless branch)"
               ;;
-            ResukiSU:*|Wild_KSU:*|Rissu:*)
+            ResukiSU:*|Wild_KSU:*|Rissu:*|KernelSU-Backslashxx:*)
               # No known-good pinned commit for this manager yet. Fall back to
               # whatever commit .gitmodules/submodule update already checked
               # out, instead of hard-failing. This is picked up by the
