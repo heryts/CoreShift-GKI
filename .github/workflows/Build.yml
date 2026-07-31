@@ -11,7 +11,7 @@ on:
       manager:
         type: choice
         required: true
-        options: ["Vanilla", "KernelSU", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
+        options: ["Vanilla", "KernelSU", "KernelSU-Backslashxx", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
         default: "Vanilla"
       manager_ref:
         description: "Optional manager git ref/commit/tag"
@@ -248,6 +248,12 @@ jobs:
           enabled: "true"
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Apply KernelSU Coccinelle manual hooks
+        if: inputs.manager == 'KernelSU'
+        uses: ./.github/actions/apply-kernelsu-coccinelle-hooks
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          
       - name: Init manager
         if: inputs.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
