@@ -225,6 +225,16 @@ runs:
             echo "This is opt-in (default n) but is what the fork's SUSFS help text"
             echo "describes as the intended hook path for kstat/mount tracking."
             add_config KSU_HACK_ARM64_BRANCH_LINK y
+          elif [ "${{ inputs.manager }}" = "KernelSU" ] && [ "${{ inputs.susfs }}" = "off" ]; then
+            echo "== KernelSU config: Coccinelle manual hook mode (susfs off) =="
+            add_config KSU y
+            add_config KSU_MANUAL_HOOK y
+            add_config KALLSYMS_ALL y
+          elif [ "${{ inputs.manager }}" = "KernelSU-Backslashxx" ]; then
+            echo "== KernelSU-Backslashxx config: Coccinelle manual hook mode =="
+            add_config KSU y
+            add_config KSU_MANUAL_HOOK y
+            add_config KALLSYMS_ALL y
           elif [ "${{ inputs.manager }}" = "ResukiSU" ]; then
             add_config KSU y
             if [ "${{ inputs.susfs }}" = "on" ]; then
