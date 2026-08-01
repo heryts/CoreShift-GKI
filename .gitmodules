@@ -21,7 +21,7 @@
 [submodule "manager/Wild_KSU"]
 	path = manager/Wild_KSU
 	url = https://github.com/WildKernels/Wild_KSU.git
-	branch = main
+	branch = dev
 [submodule "manager/Rissu"]
 	path = manager/Rissu
 	url = https://github.com/rsuntk/KernelSU.git
