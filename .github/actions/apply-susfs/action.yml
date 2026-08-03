@@ -34,6 +34,8 @@ runs:
             ;;
         esac
 
+        SUSFS_PATCH_VERSION="$SUSFS_BRANCH"
+
         if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
           echo "== KernelSU-Next: using -dev branch (matches dev-susfs pre-integration) =="
           SUSFS_BRANCH="${SUSFS_BRANCH}-dev"
