@@ -37,9 +37,6 @@ runs:
         SUSFS_CLONE_DIR="${RUNNER_TEMP:-/tmp}/susfs4ksu"
         rm -rf "$SUSFS_CLONE_DIR"
 
-        echo "== cloning susfs4ksu (branch: $SUSFS_BRANCH) =="
-        git clone --branch "$SUSFS_BRANCH" https://gitlab.com/simonpunk/susfs4ksu.git "$SUSFS_CLONE_DIR"
-
         if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
           echo "== KernelSU-Next: cloning WildKernels/susfs4ksu (pre-adapted for pershoot fork) =="
           SUSFS_REPO_URL="https://gitlab.com/WildKernels/susfs4ksu.git"
@@ -47,30 +44,21 @@ runs:
           SUSFS_REPO_URL="https://gitlab.com/simonpunk/susfs4ksu.git"
         fi
 
+        echo "== cloning susfs4ksu (branch: $SUSFS_BRANCH) =="
+        git clone --branch "$SUSFS_BRANCH" "$SUSFS_REPO_URL" "$SUSFS_CLONE_DIR"
+
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          echo "== skipping susfs_ref pin for KernelSU-Next; using WildKernels branch HEAD =="
+        else
+          echo "== pinning to ref: ${{ inputs.susfs_ref }} =="
+          git -C "$SUSFS_CLONE_DIR" checkout "${{ inputs.susfs_ref }}"
+        fi
+
         SUSFS_COMMIT="$(git -C "$SUSFS_CLONE_DIR" rev-parse --short HEAD)"
         SUSFS_COMMIT_MSG="$(git -C "$SUSFS_CLONE_DIR" log -1 --format='%s')"
         SUSFS_COMMIT_DATE="$(git -C "$SUSFS_CLONE_DIR" log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')"
-        echo "susfs4ksu pinned commit: $SUSFS_COMMIT ($SUSFS_COMMIT_DATE) - $SUSFS_COMMIT_MSG"
-
-        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
-          echo "== applying pershoot coexistence patches to susfs4ksu source =="
-          echo "pershoot/KernelSU-Next's core_hook.c uses a different SUSFS API shape;"
-          echo "these patches (from WildKernels/kernel_patches) adapt official susfs4ksu"
-          echo "to be source-compatible with it."
-
-          PERSHOOT_PATCH_BASE="https://raw.githubusercontent.com/WildKernels/kernel_patches/main/pershoot/susfs4ksu"
-
-          curl -fsSL "$PERSHOOT_PATCH_BASE/0001-pershoot-Allow-core-to-be-built-with-no-features.patch" -o /tmp/0001-pershoot.patch
-          curl -fsSL "$PERSHOOT_PATCH_BASE/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch" -o /tmp/0002-pershoot.patch
-
-          cd "$SUSFS_CLONE_DIR"
-          patch -p1 < /tmp/0001-pershoot.patch
-          patch -p1 < /tmp/0002-pershoot.patch
-          cd - > /dev/null
-
-          echo "pershoot coexistence patches applied to susfs4ksu source"
-        fi
-        
+        echo "susfs4ksu resolved commit: $SUSFS_COMMIT ($SUSFS_COMMIT_DATE) - $SUSFS_COMMIT_MSG"
+                
         PATCH_DIR="$SUSFS_CLONE_DIR/kernel_patches"
 
         echo "== SUSFS4KSU patch dir =="
