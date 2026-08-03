@@ -22,6 +22,9 @@ runs:
     - shell: bash
       run: |
         set -euo pipefail
+        
+        git config --global user.email "bot@github.com"
+        git config --global user.name "Workflow Bot"
 
         MANAGER="${{ inputs.manager }}"
         KERNEL_VERSION="${{ inputs.kernel_version }}"
@@ -264,9 +267,6 @@ runs:
         else
           echo "::warning::Integrated KSU root is not a git repository; cannot verify exact HEAD"
         fi
-
-        git config --global user.email "bot@github.com"
-        git config --global user.name "Workflow Bot"
 
         git add .
         git commit -m "Integrate ${{ inputs.manager }} and remove dirty tag" || true
