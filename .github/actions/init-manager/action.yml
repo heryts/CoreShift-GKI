@@ -167,6 +167,7 @@ runs:
           exit 1
         fi
 
+        git config --global pull.rebase false
         echo "== run manager setup =="
         echo "setup_script=$SETUP_SCRIPT"
         echo "setup_ref=${SELECTED_MANAGER_REF:-none}"
