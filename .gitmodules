@@ -8,7 +8,7 @@
 	branch = dev
 [submodule "manager/KSUN-Susfs-Hookless"]
 	path = manager/KSUN-Susfs-Hookless
-	url = https://github.com/MirahSyakilla/KSUN
+	url = https://github.com/heryts/KSUN
 	branch = susfs+nomount-hookless
 [submodule "manager/KowSU"]
 	path = manager/KowSU
