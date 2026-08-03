@@ -6,7 +6,7 @@
 	path = manager/KernelSU-Next-Original
 	url = https://github.com/KernelSU-Next/KernelSU-Next
 	branch = next
-[submodule "manager/KSUN-Fork-Susfs-Hookles"]
+[submodule "manager/KSUN-Susfs-Hookless"]
 	path = manager/KernelSU-Next
 	url = https://github.com/heryts/KSUN.git
 	branch = susfs+nomount-hookless
