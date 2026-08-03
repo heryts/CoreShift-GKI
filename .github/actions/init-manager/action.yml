@@ -38,13 +38,15 @@ runs:
         echo "common_dir=$COMMON_DIR"
 
         git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
-
-        if [ "$MANAGER" = "KernelSU-Next" ]; then
-          echo "== KernelSU-Next: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
+        
+        if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
+          echo "== KSUN-Susfs-Hookless: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
           echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
           echo "used for all kernel_version values until the fork gains 6.1/6.6 support"
-          
-          echo "== unshallow KernelSU-Next submodule =="
+        fi
+
+        if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
+          echo "== unshallow KernelSU-Next-family submodule =="
           echo "needed for correct version code (commit count) and tag lookups"
           if [ "$(git -C "manager/${MANAGER}" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
             git -C "manager/${MANAGER}" fetch --unshallow origin
@@ -84,15 +86,13 @@ runs:
               SELECTED_MANAGER_REF="cf087d755af8e322e6840d02b082a7b3871726c7"
               MANAGER_REF_SOURCE="susfs-default"
               ;;
-            KernelSU-Next:5.10|KernelSU-Next:6.1|KernelSU-Next:6.6|KernelSU-Next:6.12)
-              # The MirahSyakilla/KSUN fork's susfs+nomount-hookless branch is
-              # already SUSFS-integrated at the source (see .gitmodules), so no
-              # separate ref override is needed here — the submodule checkout
-              # from that branch is itself the SUSFS-compatible commit.
+            KSUN-Susfs-Hookless:5.10|KSUN-Susfs-Hookless:6.1|KSUN-Susfs-Hookless:6.6|KSUN-Susfs-Hookless:6.12)
+              # susfs+nomount-hookless branch is already SUSFS-integrated at the source
+              # (see .gitmodules) — no separate ref override needed.
               SELECTED_MANAGER_REF=""
               MANAGER_REF_SOURCE="susfs-default (KSUN susfs+nomount-hookless branch)"
               ;;
-            ResukiSU:*|Wild_KSU:*|Rissu:*|KernelSU-Backslashxx:*)
+            ResukiSU:*|Wild_KSU:*|Rissu:*|KernelSU-Backslashxx:*|KernelSU-Next:*)
               # No known-good pinned commit for this manager yet. Fall back to
               # whatever commit .gitmodules/submodule update already checked
               # out, instead of hard-failing. This is picked up by the
@@ -137,7 +137,7 @@ runs:
         # Critical fix:
         # If no explicit/SUSFS ref was selected, pass the actual submodule HEAD
         # into KernelSU/KowSU setup.sh instead of letting setup.sh use its own default.
-        if [ -z "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "ResukiSU" ] || [ "$MANAGER" = "Wild_KSU" ] || [ "$MANAGER" = "Rissu" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
+        if [ -z "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "ResukiSU" ] || [ "$MANAGER" = "Wild_KSU" ] || [ "$MANAGER" = "Rissu" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ] || [ "$MANAGER" = "KernelSU-Next" ]; }; then
           SELECTED_MANAGER_REF="$MANAGER_HEAD"
           MANAGER_REF_SOURCE="submodule-head"
           echo "using submodule HEAD as setup ref: $SELECTED_MANAGER_REF"
@@ -156,7 +156,7 @@ runs:
         echo "setup_script=$SETUP_SCRIPT"
         echo "setup_ref=${SELECTED_MANAGER_REF:-none}"
 
-        if [ "$MANAGER" = "KernelSU-Next" ]; then
+        if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== link expected KernelSU-Next repo folder to submodule =="
           ln -sfn "$MANAGER_DIR" "$COMMON_DIR/KernelSU-Next"
           echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
@@ -164,7 +164,7 @@ runs:
 
         cd "$COMMON_DIR"
 
-        if [ "$MANAGER" = "KernelSU-Next" ]; then
+        if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== link expected KernelSU-Next repo folder to submodule =="
           ln -sfn "$MANAGER_DIR" "$COMMON_DIR/KernelSU-Next"
           echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
@@ -176,7 +176,7 @@ runs:
           bash "$SETUP_SCRIPT"
         fi
 
-        if [ "$MANAGER" = "KernelSU-Next" ]; then
+        if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== restore pinned submodule commit after setup.sh =="
           echo "setup.sh may have run git stash/checkout/pull inside the submodule;"
           echo "forcing it back to the .gitmodules-pinned commit: $PRE_SETUP_MANAGER_HEAD"
