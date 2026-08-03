@@ -42,17 +42,10 @@ runs:
         if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
           echo "== KernelSU-Next + SUSFS: switching to pershoot/KernelSU-Next fork (SUSFS pre-integrated) =="
           echo "NOTE: fork maintainer states this is not production-ready; use at your own risk."
-          echo "NOTE: this fork's branches are rolling/rebased periodically; always fetching branch HEAD."
+          echo "NOTE: this fork uses a single branch (next-susfs) across all kernel versions;"
+          echo "per-kernel-version differences are handled by setup.sh itself, not separate branches."
 
-          case "$KERNEL_VERSION" in
-            5.10) PERSHOOT_BRANCH="gki-android12-5.10" ;;
-            6.1)  PERSHOOT_BRANCH="gki-android14-6.1" ;;
-            6.6)  PERSHOOT_BRANCH="gki-android15-6.6" ;;
-            *)
-              echo "::error::No known pershoot/KernelSU-Next SUSFS branch for kernel_version=${KERNEL_VERSION}"
-              exit 1
-              ;;
-          esac
+          PERSHOOT_BRANCH="next-susfs"
 
           git -C "manager/${MANAGER}" remote set-url origin "https://github.com/pershoot/KernelSU-Next.git"
           git -C "manager/${MANAGER}" fetch --depth 1 origin "$PERSHOOT_BRANCH"
