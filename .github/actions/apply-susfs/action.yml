@@ -112,7 +112,7 @@ runs:
         KSU_MARKERS="$(
           find -L "$COMMON_DIR" \
             -type f \
-            -path "*/kernel/include/ksu.h" \
+            \( -path "*/kernel/include/ksu.h" -o -path "*/kernel/ksu.h" \) \
             -print
         )"
 
@@ -123,6 +123,7 @@ runs:
 
         KSU_MARKER="$(printf '%s\n' "$KSU_MARKERS" | sort | head -n 1)"
         KSU_ROOT="${KSU_MARKER%/kernel/include/ksu.h}"
+        KSU_ROOT="${KSU_ROOT%/kernel/ksu.h}"
 
         echo "KSU_ROOT=$KSU_ROOT"
 
