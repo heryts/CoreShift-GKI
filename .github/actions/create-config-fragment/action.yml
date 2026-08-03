@@ -204,7 +204,7 @@ runs:
           add_config BTRFS_FS y
         fi
 
-        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+        if [ "${{ inputs.manager }}" = "KSUN-Susfs-Hookless" ]; then
           if [ "${{ inputs.susfs }}" = "on" ]; then
             echo "== SUSFS config: KernelSU-Next (hookless/kprobes fork) =="
             echo "Using fork-native symbols KSU_KPROBES_SUSFS + KSU_KPROBES_NOMOUNT."
