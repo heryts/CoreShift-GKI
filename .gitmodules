@@ -5,7 +5,7 @@
 [submodule "manager/KernelSU-Next"]
 	path = manager/KernelSU-Next
 	url = https://github.com/KernelSU-Next/KernelSU-Next
-	branch = nex
+	branch = next
 [submodule "manager/KSUN-Susfs-Hookless"]
 	path = manager/KSUN-Susfs-Hookless
 	url = https://github.com/MirahSyakilla/KSUN
