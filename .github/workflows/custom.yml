@@ -12,32 +12,11 @@ on:
         required: true
         options: ["Vanilla", "KernelSU", "KernelSU-Backslashxx", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
         default: "Vanilla"
-      manager_ref:
-        description: "Optional manager git ref/commit/tag"
-        required: false
-        default: ""
       source_mode:
         type: choice
         required: true
         options: ["google-lts", "maintained", "pixel", "custom"]
         default: "google-lts"
-      pixel_branch:
-        type: choice
-        required: false
-        options:
-          - "android14-gs-pixel-6.1"
-          - "android-gs-raviole-6.1-android16"
-          - "android-gs-bluejay-6.1-android16"
-          - "android-gs-akita-6.1-android16"
-        default: "android14-gs-pixel-6.1"
-      source_repo:
-        description: "Custom kernel/common repo URL, used only when source_mode=custom"
-        required: false
-        default: ""
-      source_ref:
-        description: "Optional source git ref/branch/tag/commit"
-        required: false
-        default: ""
       kmi_bypass:
         type: choice
         required: true
@@ -49,29 +28,106 @@ on:
         required: true
         options: ["thin", "full", "none"]
         default: "thin"
+      ikconfig:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "on"
+      container_features:
+        description: "Enable container-related kernel options"
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
+      mount_filesystems:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "on"
+      fq_codel_features:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
+      performance_features:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
+      debug_features:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
+      heavy_debug_features:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
       susfs:
         type: choice
         required: true
         options: ["on", "off"]
         default: "off"
+      add_nomount_maxsteeel:
+        description: "NoMount_support (On:maxsteeel-nomount, Off:MirahSyakilla-nomount)"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
+      baseband_guard:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "off"
+      strict_config:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "on"
+      legacy_kmi_check:
+        type: choice
+        required: true
+        options: ["on", "off"]
+        default: "on"
       droidspaces:
         description: "Droidspaces support (5.10~6.6: slot patch, 6.12: on/off)"
         type: choice
         required: true
         options: ["off", "678", "123", "345"]
         default: "off"
+      droidspaces_ntsync:
+        description: "NTSync support for Droidspaces containers"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
+      re_kernel:
+        description: "启用 Re-Kernel 驱动"
+        type: choice
+        required: true
+        options: ["off", "on"]
+        default: "off"
       publish_mode:
         type: choice
         required: true
         options: ["release", "artifact", "both"]
         default: "artifact"
-      enable_features:
-        description: "Comma-separated OFF-by-default features to enable: container, fq_codel, performance, debug, heavy_debug, baseband_guard, nomount_maxsteeel, droidspaces_ntsync, re_kernel"
+      version:
+        description: "Custom version name (optional, blank = auto-generated)"
         type: string
-        required: false
         default: ""
-      disable_features:
-        description: "Comma-separated ON-by-default features to disable: ikconfig, mount_filesystems, strict_config, legacy_kmi_check"
+        required: false
+      build_time:
+        description: "Custom build time (blank = current UTC)"
+        type: string
+        default: ""
+        required: false
+      advanced_config:
+        description: >-
+          Optional JSON for rarely-changed advanced options. Keys: manager_ref,
+          source_ref, pixel_branch, source_repo. Example:
+          {"manager_ref": "dev", "pixel_branch": "android-gs-raviole-6.1-android16"}
         type: string
         required: false
         default: ""
@@ -100,13 +156,13 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ inputs.source_mode }}" = "custom" ] && [ -z "${{ inputs.source_repo }}" ]; then
-            echo "::error::source_repo is required when source_mode=custom"
+          if [ "${{ inputs.source_mode }}" = "pixel" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
+            echo "::error::source_mode=pixel currently supports Pixel 6+ 6.1 branches only; choose kernel_version=6.1"
             exit 1
           fi
 
-          if [ "${{ inputs.source_mode }}" = "pixel" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
-            echo "::error::source_mode=pixel currently supports Pixel 6+ 6.1 branches only; choose kernel_version=6.1"
+          if [ "${{ inputs.droidspaces_ntsync }}" = "on" ] && [ "${{ inputs.droidspaces }}" = "off" ]; then
+            echo "::error::droidspaces_ntsync=on requires droidspaces to be enabled (not 'off')"
             exit 1
           fi
 
@@ -121,78 +177,51 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
-      # Turns enable_features / disable_features into per-feature env vars
-      # (CONTAINER_FEATURES, BASEBAND_GUARD, IKCONFIG, ...) consumed by later
-      # steps, instead of one dedicated workflow_dispatch input per feature.
-      - name: Parse feature flags
-        id: features
+      # Parses advanced_config (a small JSON blob) into env vars, instead of
+      # having one workflow_dispatch input per rarely-changed advanced option.
+      - name: Parse advanced config
+        id: advanced-config
         shell: bash
         run: |
           set -euo pipefail
 
-          declare -A FEATURES=(
-            [ikconfig]="on"
-            [container_features]="off"
-            [mount_filesystems]="on"
-            [fq_codel_features]="off"
-            [performance_features]="off"
-            [debug_features]="off"
-            [heavy_debug_features]="off"
-            [baseband_guard]="off"
-            [strict_config]="on"
-            [legacy_kmi_check]="on"
-            [add_nomount_maxsteeel]="off"
-            [droidspaces_ntsync]="off"
-            [re_kernel]="off"
-          )
+          raw='${{ inputs.advanced_config }}'
+          if [ -z "$raw" ]; then
+            raw='{}'
+          fi
 
-          declare -A ALIASES=(
-            [ikconfig]="ikconfig"
-            [container]="container_features"
-            [mount_filesystems]="mount_filesystems"
-            [fq_codel]="fq_codel_features"
-            [performance]="performance_features"
-            [debug]="debug_features"
-            [heavy_debug]="heavy_debug_features"
-            [baseband_guard]="baseband_guard"
-            [strict_config]="strict_config"
-            [legacy_kmi_check]="legacy_kmi_check"
-            [nomount_maxsteeel]="add_nomount_maxsteeel"
-            [droidspaces_ntsync]="droidspaces_ntsync"
-            [re_kernel]="re_kernel"
-          )
-
-          apply_list() {
-            local raw="$1"
-            local target_value="$2"
-            local input_name="$3"
-
-            IFS=',' read -ra items <<< "$raw"
-            for item in "${items[@]}"; do
-              item="$(echo -n "$item" | xargs)"
-              [ -z "$item" ] && continue
-
-              key="${ALIASES[$item]:-}"
-              if [ -z "$key" ]; then
-                echo "::error::Unknown feature flag '$item' in ${input_name} (see input description for valid names)"
-                exit 1
-              fi
-              FEATURES[$key]="$target_value"
-            done
-          }
-
-          apply_list "${{ inputs.enable_features }}" "on" "enable_features"
-          apply_list "${{ inputs.disable_features }}" "off" "disable_features"
-
-          if [ "${FEATURES[droidspaces_ntsync]}" = "on" ] && [ "${{ inputs.droidspaces }}" = "off" ]; then
-            echo "::error::droidspaces_ntsync (via enable_features) requires droidspaces to be enabled (not 'off')"
+          if ! echo "$raw" | jq empty 2>/dev/null; then
+            echo "::error::advanced_config is not valid JSON"
             exit 1
           fi
 
-          for key in "${!FEATURES[@]}"; do
-            upper_key=$(echo "$key" | tr '[:lower:]' '[:upper:]')
-            echo "${upper_key}=${FEATURES[$key]}" >> "$GITHUB_ENV"
+          allowed_keys="manager_ref source_ref pixel_branch source_repo"
+          for k in $(echo "$raw" | jq -r 'keys[]'); do
+            case " $allowed_keys " in
+              *" $k "*) ;;
+              *)
+                echo "::error::Unknown key '$k' in advanced_config (allowed: $allowed_keys)"
+                exit 1
+                ;;
+            esac
           done
+
+          manager_ref=$(echo "$raw" | jq -r '.manager_ref // ""')
+          source_ref=$(echo "$raw" | jq -r '.source_ref // ""')
+          pixel_branch=$(echo "$raw" | jq -r '.pixel_branch // "android14-gs-pixel-6.1"')
+          source_repo=$(echo "$raw" | jq -r '.source_repo // ""')
+
+          if [ "${{ inputs.source_mode }}" = "custom" ] && [ -z "$source_repo" ]; then
+            echo "::error::advanced_config.source_repo is required when source_mode=custom"
+            exit 1
+          fi
+
+          {
+            echo "MANAGER_REF=$manager_ref"
+            echo "SOURCE_REF=$source_ref"
+            echo "PIXEL_BRANCH=$pixel_branch"
+            echo "SOURCE_REPO=$source_repo"
+          } >> "$GITHUB_ENV"
 
       - name: Select Pixel manifest branch
         if: inputs.source_mode == 'pixel'
@@ -200,9 +229,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "BRANCH=${{ inputs.pixel_branch }}" >> "$GITHUB_ENV"
+          echo "BRANCH=${{ env.PIXEL_BRANCH }}" >> "$GITHUB_ENV"
           echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
-          echo "Pixel source mode selected: official Google Pixel manifest branch ${{ inputs.pixel_branch }}"
+          echo "Pixel source mode selected: official Google Pixel manifest branch ${{ env.PIXEL_BRANCH }}"
 
       - name: Set custom output name
         id: custom-name
@@ -216,12 +245,18 @@ jobs:
           fi
 
           bbg_label=""
-          if [ "${{ env.BASEBAND_GUARD }}" = "on" ]; then
+          if [ "${{ inputs.baseband_guard }}" = "on" ]; then
             bbg_label="-bbg"
           fi
 
           variant_suffix="${susfs_label}${bbg_label}"
-          final_name="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}-${DATE}-${{ github.run_number }}"
+
+          base_label="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}"
+          if [ -n "${{ inputs.version }}" ]; then
+            base_label="${{ inputs.version }}"
+          fi
+
+          final_name="${base_label}${variant_suffix}-${DATE}-${{ github.run_number }}"
           config_base="config-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}"
 
           {
@@ -251,7 +286,7 @@ jobs:
           set -euo pipefail
 
           effective_source_repo=""
-          effective_source_ref="${{ inputs.source_ref }}"
+          effective_source_ref="${{ env.SOURCE_REF }}"
 
           case "${{ inputs.source_mode }}" in
             google-lts)
@@ -278,7 +313,7 @@ jobs:
               esac
               ;;
             custom)
-              effective_source_repo="${{ inputs.source_repo }}"
+              effective_source_repo="${{ env.SOURCE_REPO }}"
               ;;
             *)
               echo "::error::unsupported source_mode=${{ inputs.source_mode }}"
@@ -323,7 +358,7 @@ jobs:
         uses: ./.github/actions/init-manager
         with:
           manager: ${{ inputs.manager }}
-          manager_ref: ${{ inputs.manager_ref }}
+          manager_ref: ${{ env.MANAGER_REF }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
@@ -341,16 +376,16 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply NoMount support (maxsteeel)
-        if: env.ADD_NOMOUNT_MAXSTEEEL == 'on'
+        if: inputs.add_nomount_maxsteeel == 'on'
         uses: ./.github/actions/apply-nomount
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply Baseband Guard
-        if: env.BASEBAND_GUARD == 'on'
+        if: inputs.baseband_guard == 'on'
         uses: ./.github/actions/apply-baseband-guard
         with:
-          baseband_guard: ${{ env.BASEBAND_GUARD }}
+          baseband_guard: ${{ inputs.baseband_guard }}
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply Droidspaces support
@@ -361,13 +396,13 @@ jobs:
           droidspaces: ${{ inputs.droidspaces }}
 
       - name: Apply NTSync support
-        if: inputs.droidspaces != 'off' && env.DROIDSPACES_NTSYNC == 'on'
+        if: inputs.droidspaces != 'off' && inputs.droidspaces_ntsync == 'on'
         uses: ./.github/actions/apply-ntsync
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply Re-Kernel driver
-        if: env.RE_KERNEL == 'on'
+        if: inputs.re_kernel == 'on'
         uses: ./.github/actions/apply-re-kernel
         with:
           kernel_version: ${{ inputs.kernel_version }}
@@ -376,25 +411,25 @@ jobs:
         uses: ./.github/actions/create-config-fragment
         with:
           manager: ${{ inputs.manager }}
-          add_nomount_maxsteeel: ${{ env.ADD_NOMOUNT_MAXSTEEEL }}
+          add_nomount_maxsteeel: ${{ inputs.add_nomount_maxsteeel }}
           droidspaces: ${{ inputs.droidspaces }}
-          droidspaces_ntsync: ${{ env.DROIDSPACES_NTSYNC }}
-          re_kernel: ${{ env.RE_KERNEL }}
-          ikconfig: ${{ env.IKCONFIG }}
-          container_core: ${{ env.CONTAINER_FEATURES }}
-          container_ipc: ${{ env.CONTAINER_FEATURES }}
-          mount_filesystems: ${{ env.MOUNT_FILESYSTEMS }}
-          container_networking: ${{ env.CONTAINER_FEATURES }}
-          fq_codel_features: ${{ env.FQ_CODEL_FEATURES }}
-          performance_features: ${{ env.PERFORMANCE_FEATURES }}
-          debug_features: ${{ env.DEBUG_FEATURES }}
-          heavy_debug_features: ${{ env.HEAVY_DEBUG_FEATURES }}
+          droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
+          re_kernel: ${{ inputs.re_kernel }}
+          ikconfig: ${{ inputs.ikconfig }}
+          container_core: ${{ inputs.container_features }}
+          container_ipc: ${{ inputs.container_features }}
+          mount_filesystems: ${{ inputs.mount_filesystems }}
+          container_networking: ${{ inputs.container_features }}
+          fq_codel_features: ${{ inputs.fq_codel_features }}
+          performance_features: ${{ inputs.performance_features }}
+          debug_features: ${{ inputs.debug_features }}
+          heavy_debug_features: ${{ inputs.heavy_debug_features }}
           susfs: ${{ inputs.susfs }}
-          baseband_guard: ${{ env.BASEBAND_GUARD }}
+          baseband_guard: ${{ inputs.baseband_guard }}
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Apply IPC KABI patches
-        if: env.CONTAINER_FEATURES == 'on'
+        if: inputs.container_features == 'on'
         uses: ./.github/actions/apply-ipc-kabi-patches
         with:
           kernel_version: ${{ inputs.kernel_version }}
@@ -403,14 +438,14 @@ jobs:
         if: inputs.kernel_version == '5.10'
         uses: ./.github/actions/install-legacy-private-fragment
         with:
-          strict_config: ${{ env.STRICT_CONFIG }}
+          strict_config: ${{ inputs.strict_config }}
 
       - name: Disable legacy 5.10 defconfig normalization check
         if: inputs.kernel_version == '5.10'
         uses: ./.github/actions/disable-legacy-defconfig-check
 
       - name: Disable legacy 5.10 strict KMI check for private build
-        if: inputs.kernel_version == '5.10' && env.LEGACY_KMI_CHECK == 'off'
+        if: inputs.kernel_version == '5.10' && inputs.legacy_kmi_check == 'off'
         uses: ./.github/actions/disable-legacy-kmi-check
 
       - name: Add swap for full LTO
@@ -435,6 +470,8 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           source_mode: ${{ inputs.source_mode }}
           kmi_bypass: ${{ inputs.kmi_bypass }}
+          version: ${{ inputs.version }}
+          build_time: ${{ inputs.build_time }}
 
       - name: Write compiler metadata
         uses: ./.github/actions/write-compiler-metadata
@@ -444,7 +481,7 @@ jobs:
       - name: Verify final config
         uses: ./.github/actions/verify-final-config
         with:
-          strict_config: ${{ env.STRICT_CONFIG }}
+          strict_config: ${{ inputs.strict_config }}
 
       - name: Export final config
         uses: ./.github/actions/export-final-config
@@ -535,7 +572,7 @@ jobs:
           fi
 
           bbg_label="Disabled"
-          if [ "${{ env.BASEBAND_GUARD }}" = "on" ]; then
+          if [ "${{ inputs.baseband_guard }}" = "on" ]; then
             bbg_label="Enabled"
           fi
 
