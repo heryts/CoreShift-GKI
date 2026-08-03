@@ -40,8 +40,14 @@ runs:
         echo "== cloning susfs4ksu (branch: $SUSFS_BRANCH) =="
         git clone --branch "$SUSFS_BRANCH" https://gitlab.com/simonpunk/susfs4ksu.git "$SUSFS_CLONE_DIR"
 
-        echo "== pinning to ref: ${{ inputs.susfs_ref }} =="
-        git -C "$SUSFS_CLONE_DIR" checkout "${{ inputs.susfs_ref }}"
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          echo "== skipping susfs_ref pin for KernelSU-Next =="
+          echo "pershoot's coexistence patches are designed against the branch HEAD,"
+          echo "not the older pinned commit used for other managers."
+        else
+          echo "== pinning to ref: ${{ inputs.susfs_ref }} =="
+          git -C "$SUSFS_CLONE_DIR" checkout "${{ inputs.susfs_ref }}"
+        fi
 
         SUSFS_COMMIT="$(git -C "$SUSFS_CLONE_DIR" rev-parse --short HEAD)"
         SUSFS_COMMIT_MSG="$(git -C "$SUSFS_CLONE_DIR" log -1 --format='%s')"
