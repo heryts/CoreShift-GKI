@@ -43,29 +43,18 @@ runs:
         git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
 
         if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
-          echo "== KernelSU-Next + SUSFS: switching to pershoot/KernelSU-Next fork (SUSFS pre-integrated) =="
+          echo "== KernelSU-Next + SUSFS: fresh clone of pershoot/KernelSU-Next (not reusing old submodule checkout) =="
           echo "NOTE: fork maintainer states this is not production-ready; use at your own risk."
-          echo "NOTE: this fork uses a single branch (next-susfs) across all kernel versions;"
-          echo "per-kernel-version differences are handled by setup.sh itself, not separate branches."
+          echo "A fresh clone avoids setup.sh's internal git-pull colliding with the old"
+          echo "upstream history left over from the original submodule checkout."
 
           PERSHOOT_BRANCH="next-susfs"
 
-          git -C "manager/${MANAGER}" remote set-url origin "https://github.com/pershoot/KernelSU-Next.git"
-          git -C "manager/${MANAGER}" fetch --depth 1 origin "$PERSHOOT_BRANCH"
-          git -C "manager/${MANAGER}" checkout FETCH_HEAD
+          rm -rf "manager/${MANAGER}"
+          git clone --branch "$PERSHOOT_BRANCH" --depth 1 "https://github.com/pershoot/KernelSU-Next.git" "manager/${MANAGER}"
 
           PERSHOOT_HEAD="$(git -C "manager/${MANAGER}" rev-parse HEAD)"
-          echo "checked out pershoot/KernelSU-Next @ ${PERSHOOT_BRANCH} (resolved: ${PERSHOOT_HEAD})"
-          echo "== clean up stale local branches/refs before setup.sh runs =="
-          echo "setup.sh checks out+pulls the tracked default branch; leftover local"
-          echo "branches from before the remote switch (pointing at old upstream content)"
-          echo "would conflict with pershoot's differently-structured source."
-
-          git -C "manager/${MANAGER}" remote set-head origin -a || true
-
-          for b in $(git -C "manager/${MANAGER}" branch --format='%(refname:short)'); do
-            git -C "manager/${MANAGER}" branch -D "$b" || true
-          done
+          echo "cloned pershoot/KernelSU-Next @ ${PERSHOOT_BRANCH} (resolved: ${PERSHOOT_HEAD})"
         fi
         
         if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
