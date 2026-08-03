@@ -67,7 +67,7 @@ runs:
         SUSFS_C="$PATCH_DIR/fs/susfs.c"
         SUSFS_INCLUDE_DIR="$PATCH_DIR/include/linux"
         KSU_PATCH="$PATCH_DIR/KernelSU/10_enable_susfs_for_ksu.patch"
-        SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_${SUSFS_BRANCH}.patch"
+        SUSFS_PATCH="$PATCH_DIR/50_add_susfs_in_${SUSFS_PATCH_VERSION}.patch"
 
         for path in "$PATCH_DIR" "$SUSFS_C" "$SUSFS_INCLUDE_DIR" "$SUSFS_PATCH" "$KSU_PATCH"; do
           if [ ! -e "$path" ]; then
