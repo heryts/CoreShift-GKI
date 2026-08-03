@@ -34,26 +34,24 @@ runs:
             ;;
         esac
 
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          echo "== KernelSU-Next: using -dev branch (matches dev-susfs pre-integration) =="
+          SUSFS_BRANCH="${SUSFS_BRANCH}-dev"
+        fi
+
         SUSFS_CLONE_DIR="${RUNNER_TEMP:-/tmp}/susfs4ksu"
         rm -rf "$SUSFS_CLONE_DIR"
 
-        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
-          echo "== KernelSU-Next: cloning WildKernels/susfs4ksu (pre-adapted for pershoot fork) =="
-          SUSFS_REPO_URL="https://gitlab.com/WildKernels/susfs4ksu.git"
-        else
-          SUSFS_REPO_URL="https://gitlab.com/simonpunk/susfs4ksu.git"
-        fi
-
         echo "== cloning susfs4ksu (branch: $SUSFS_BRANCH) =="
-        git clone --branch "$SUSFS_BRANCH" "$SUSFS_REPO_URL" "$SUSFS_CLONE_DIR"
+        git clone --branch "$SUSFS_BRANCH" https://gitlab.com/simonpunk/susfs4ksu.git "$SUSFS_CLONE_DIR"
 
         if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
-          echo "== skipping susfs_ref pin for KernelSU-Next; using WildKernels branch HEAD =="
+          echo "== skipping susfs_ref pin for KernelSU-Next; using -dev branch HEAD =="
         else
           echo "== pinning to ref: ${{ inputs.susfs_ref }} =="
           git -C "$SUSFS_CLONE_DIR" checkout "${{ inputs.susfs_ref }}"
         fi
-
+        
         SUSFS_COMMIT="$(git -C "$SUSFS_CLONE_DIR" rev-parse --short HEAD)"
         SUSFS_COMMIT_MSG="$(git -C "$SUSFS_CLONE_DIR" log -1 --format='%s')"
         SUSFS_COMMIT_DATE="$(git -C "$SUSFS_CLONE_DIR" log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')"
