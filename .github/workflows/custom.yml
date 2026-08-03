@@ -12,11 +12,32 @@ on:
         required: true
         options: ["Vanilla", "KernelSU", "KernelSU-Backslashxx", "KernelSU-Next", "KowSU", "ResukiSU", "Rissu", "Wild_KSU"]
         default: "Vanilla"
+      manager_ref:
+        description: "Optional manager git ref/commit/tag"
+        required: false
+        default: ""
       source_mode:
         type: choice
         required: true
         options: ["google-lts", "maintained", "pixel", "custom"]
         default: "google-lts"
+      pixel_branch:
+        type: choice
+        required: false
+        options:
+          - "android14-gs-pixel-6.1"
+          - "android-gs-raviole-6.1-android16"
+          - "android-gs-bluejay-6.1-android16"
+          - "android-gs-akita-6.1-android16"
+        default: "android14-gs-pixel-6.1"
+      source_repo:
+        description: "Custom kernel/common repo URL, used only when source_mode=custom"
+        required: false
+        default: ""
+      source_ref:
+        description: "Optional source git ref/branch/tag/commit"
+        required: false
+        default: ""
       kmi_bypass:
         type: choice
         required: true
@@ -113,24 +134,6 @@ on:
         required: true
         options: ["release", "artifact", "both"]
         default: "artifact"
-      version:
-        description: "Custom version name (optional, blank = auto-generated)"
-        type: string
-        default: ""
-        required: false
-      build_time:
-        description: "Custom build time (blank = current UTC)"
-        type: string
-        default: ""
-        required: false
-      advanced_config:
-        description: >-
-          Optional JSON for rarely-changed advanced options. Keys: manager_ref,
-          source_ref, pixel_branch, source_repo. Example:
-          {"manager_ref": "dev", "pixel_branch": "android-gs-raviole-6.1-android16"}
-        type: string
-        required: false
-        default: ""
 
 jobs:
   build:
@@ -156,6 +159,11 @@ jobs:
             exit 1
           fi
 
+          if [ "${{ inputs.source_mode }}" = "custom" ] && [ -z "${{ inputs.source_repo }}" ]; then
+            echo "::error::source_repo is required when source_mode=custom"
+            exit 1
+          fi
+
           if [ "${{ inputs.source_mode }}" = "pixel" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
             echo "::error::source_mode=pixel currently supports Pixel 6+ 6.1 branches only; choose kernel_version=6.1"
             exit 1
@@ -177,61 +185,15 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
-      # Parses advanced_config (a small JSON blob) into env vars, instead of
-      # having one workflow_dispatch input per rarely-changed advanced option.
-      - name: Parse advanced config
-        id: advanced-config
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          raw='${{ inputs.advanced_config }}'
-          if [ -z "$raw" ]; then
-            raw='{}'
-          fi
-
-          if ! echo "$raw" | jq empty 2>/dev/null; then
-            echo "::error::advanced_config is not valid JSON"
-            exit 1
-          fi
-
-          allowed_keys="manager_ref source_ref pixel_branch source_repo"
-          for k in $(echo "$raw" | jq -r 'keys[]'); do
-            case " $allowed_keys " in
-              *" $k "*) ;;
-              *)
-                echo "::error::Unknown key '$k' in advanced_config (allowed: $allowed_keys)"
-                exit 1
-                ;;
-            esac
-          done
-
-          manager_ref=$(echo "$raw" | jq -r '.manager_ref // ""')
-          source_ref=$(echo "$raw" | jq -r '.source_ref // ""')
-          pixel_branch=$(echo "$raw" | jq -r '.pixel_branch // "android14-gs-pixel-6.1"')
-          source_repo=$(echo "$raw" | jq -r '.source_repo // ""')
-
-          if [ "${{ inputs.source_mode }}" = "custom" ] && [ -z "$source_repo" ]; then
-            echo "::error::advanced_config.source_repo is required when source_mode=custom"
-            exit 1
-          fi
-
-          {
-            echo "MANAGER_REF=$manager_ref"
-            echo "SOURCE_REF=$source_ref"
-            echo "PIXEL_BRANCH=$pixel_branch"
-            echo "SOURCE_REPO=$source_repo"
-          } >> "$GITHUB_ENV"
-
       - name: Select Pixel manifest branch
         if: inputs.source_mode == 'pixel'
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "BRANCH=${{ env.PIXEL_BRANCH }}" >> "$GITHUB_ENV"
+          echo "BRANCH=${{ inputs.pixel_branch }}" >> "$GITHUB_ENV"
           echo "BUILD_ENGINE=kleaf" >> "$GITHUB_ENV"
-          echo "Pixel source mode selected: official Google Pixel manifest branch ${{ env.PIXEL_BRANCH }}"
+          echo "Pixel source mode selected: official Google Pixel manifest branch ${{ inputs.pixel_branch }}"
 
       - name: Set custom output name
         id: custom-name
@@ -250,13 +212,7 @@ jobs:
           fi
 
           variant_suffix="${susfs_label}${bbg_label}"
-
-          base_label="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}"
-          if [ -n "${{ inputs.version }}" ]; then
-            base_label="${{ inputs.version }}"
-          fi
-
-          final_name="${base_label}${variant_suffix}-${DATE}-${{ github.run_number }}"
+          final_name="custom-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}-${DATE}-${{ github.run_number }}"
           config_base="config-${{ inputs.kernel_version }}-${{ inputs.manager }}${variant_suffix}"
 
           {
@@ -286,7 +242,7 @@ jobs:
           set -euo pipefail
 
           effective_source_repo=""
-          effective_source_ref="${{ env.SOURCE_REF }}"
+          effective_source_ref="${{ inputs.source_ref }}"
 
           case "${{ inputs.source_mode }}" in
             google-lts)
@@ -313,7 +269,7 @@ jobs:
               esac
               ;;
             custom)
-              effective_source_repo="${{ env.SOURCE_REPO }}"
+              effective_source_repo="${{ inputs.source_repo }}"
               ;;
             *)
               echo "::error::unsupported source_mode=${{ inputs.source_mode }}"
@@ -352,13 +308,13 @@ jobs:
         with:
           enabled: "true"
           kernel_version: ${{ inputs.kernel_version }}
-
+          
       - name: Init manager
         if: inputs.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
         with:
           manager: ${{ inputs.manager }}
-          manager_ref: ${{ env.MANAGER_REF }}
+          manager_ref: ${{ inputs.manager_ref }}
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
@@ -374,7 +330,7 @@ jobs:
         uses: ./.github/actions/apply-resukisu-hooks
         with:
           kernel_version: ${{ inputs.kernel_version }}
-
+          
       - name: Apply NoMount support (maxsteeel)
         if: inputs.add_nomount_maxsteeel == 'on'
         uses: ./.github/actions/apply-nomount
@@ -470,8 +426,6 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           source_mode: ${{ inputs.source_mode }}
           kmi_bypass: ${{ inputs.kmi_bypass }}
-          version: ${{ inputs.version }}
-          build_time: ${{ inputs.build_time }}
 
       - name: Write compiler metadata
         uses: ./.github/actions/write-compiler-metadata
