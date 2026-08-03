@@ -3,12 +3,12 @@
 	url = https://github.com/tiann/KernelSU.git
 	branch = main
 [submodule "manager/KernelSU-Next"]
-	path = manager/KernelSU-Next-Original
-	url = https://github.com/KernelSU-Next/KernelSU-Next
-	branch = next
-[submodule "manager/KSUN-Susfs-Hookless"]
 	path = manager/KernelSU-Next
-	url = https://github.com/heryts/KSUN.git
+	url = https://github.com/KernelSU-Next/KernelSU-Next
+	branch = nex
+[submodule "manager/KSUN-Susfs-Hookless"]
+	path = manager/KSUN-Susfs-Hookless
+	url = https://github.com/MirahSyakilla/KSUN
 	branch = susfs+nomount-hookless
 [submodule "manager/KowSU"]
 	path = manager/KowSU
