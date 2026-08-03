@@ -42,11 +42,12 @@ runs:
         if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
           echo "== KernelSU-Next + SUSFS: switching to pershoot/KernelSU-Next fork (SUSFS pre-integrated) =="
           echo "NOTE: fork maintainer states this is not production-ready; use at your own risk."
+          echo "NOTE: this fork's branches are rolling/rebased periodically; always fetching branch HEAD."
 
           case "$KERNEL_VERSION" in
-            5.10) PERSHOOT_BRANCH="gki-android12-5.10";
-            6.1)  PERSHOOT_BRANCH="gki-android14-6.1";
-            6.6)  PERSHOOT_BRANCH="gki-android15-6.6";
+            5.10) PERSHOOT_BRANCH="gki-android12-5.10" ;;
+            6.1)  PERSHOOT_BRANCH="gki-android14-6.1" ;;
+            6.6)  PERSHOOT_BRANCH="gki-android15-6.6" ;;
             *)
               echo "::error::No known pershoot/KernelSU-Next SUSFS branch for kernel_version=${KERNEL_VERSION}"
               exit 1
@@ -57,7 +58,8 @@ runs:
           git -C "manager/${MANAGER}" fetch --depth 1 origin "$PERSHOOT_BRANCH"
           git -C "manager/${MANAGER}" checkout FETCH_HEAD
 
-          echo "checked out pershoot/KernelSU-Next ${PERSHOOT_BRANCH} (resolved: ${PERSHOOT_HEAD})"
+          PERSHOOT_HEAD="$(git -C "manager/${MANAGER}" rev-parse HEAD)"
+          echo "checked out pershoot/KernelSU-Next @ ${PERSHOOT_BRANCH} (resolved: ${PERSHOOT_HEAD})"
         fi
         
         if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
