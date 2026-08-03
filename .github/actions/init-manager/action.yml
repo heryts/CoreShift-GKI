@@ -182,7 +182,7 @@ runs:
           bash "$SETUP_SCRIPT"
         fi
 
-        if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
+        if [ "$MANAGER" = "KSUN-Susfs-Hookless" ] || { [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" != "on" ]; }; then
           echo "== restore pinned submodule commit after setup.sh =="
           echo "setup.sh may have run git stash/checkout/pull inside the submodule;"
           echo "forcing it back to the .gitmodules-pinned commit: $PRE_SETUP_MANAGER_HEAD"
@@ -194,6 +194,11 @@ runs:
             exit 1
           fi
           echo "restored manager HEAD: $RESTORED_HEAD"
+        elif [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== NOT restoring submodule HEAD =="
+          echo "setup.sh checked out dev-susfs branch on purpose; keeping it as-is for the build."
+          RESTORED_HEAD="$(git -C "$MANAGER_DIR" rev-parse HEAD)"
+          echo "manager HEAD after setup.sh (dev-susfs): $RESTORED_HEAD"
         fi
 
         if { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ]; } &&
