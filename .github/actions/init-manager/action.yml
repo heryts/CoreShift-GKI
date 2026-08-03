@@ -232,16 +232,11 @@ runs:
           }
         fi
 
-        echo "== DEBUG: locate ksu.h in this specific checkout =="
-        find "$MANAGER_DIR" -iname 'ksu.h'
-        echo "== DEBUG: full kernel/ dir listing (top 2 levels) =="
-        find "$MANAGER_DIR/kernel" -maxdepth 2 -type d
-
         echo "== verify integrated KernelSU =="
         KSU_MARKERS="$(
           find -L "$COMMON_DIR" \
             -type f \
-            -path "*/kernel/include/ksu.h" \
+            \( -path "*/kernel/include/ksu.h" -o -path "*/kernel/ksu.h" \) \
             -print || true
         )"
 
