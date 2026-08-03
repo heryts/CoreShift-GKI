@@ -38,11 +38,31 @@ runs:
         echo "common_dir=$COMMON_DIR"
 
         git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
+
+        if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== KernelSU-Next + SUSFS: switching to pershoot/KernelSU-Next fork (SUSFS pre-integrated) =="
+          echo "NOTE: fork maintainer states this is not production-ready; use at your own risk."
+
+          case "$KERNEL_VERSION" in
+            5.10) PERSHOOT_BRANCH="gki-android12-5.10"; PERSHOOT_REF="86114db0c49f20fa7857b8b559f3ab87cbc2d00d" ;;
+            6.1)  PERSHOOT_BRANCH="gki-android14-6.1";  PERSHOOT_REF="9bf72ec2c83d40f194b936cabbc64ce342e005bf" ;;
+            6.6)  PERSHOOT_BRANCH="gki-android15-6.6";  PERSHOOT_REF="2df41de789026a6422521606402576507c687435" ;;
+            *)
+              echo "::error::No known pershoot/KernelSU-Next SUSFS branch for kernel_version=${KERNEL_VERSION}"
+              exit 1
+              ;;
+          esac
+
+          git -C "manager/${MANAGER}" remote set-url origin "https://github.com/pershoot/KernelSU-Next.git"
+          git -C "manager/${MANAGER}" fetch --depth 1 origin "$PERSHOOT_REF"
+          git -C "manager/${MANAGER}" checkout FETCH_HEAD
+
+          echo "checked out pershoot/KernelSU-Next @ $PERSHOOT_BRANCH ($PERSHOOT_REF)"
+        fi
         
         if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== KSUN-Susfs-Hookless: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
           echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
-          echo "used for all kernel_version values until the fork gains 6.1/6.6 support"
         fi
 
         if [ "$MANAGER" = "KernelSU-Next" ] || [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
