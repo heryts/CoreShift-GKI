@@ -232,6 +232,12 @@ runs:
           }
         fi
 
+        echo "== DEBUG: symlink + target state =="
+        ls -la "$COMMON_DIR/KernelSU-Next" || echo "symlink missing"
+        readlink -f "$COMMON_DIR/KernelSU-Next" || echo "cannot resolve symlink"
+        ls -la "$MANAGER_DIR/kernel/include/ksu.h" || echo "target file missing"
+        ls -la "$COMMON_DIR/KernelSU-Next/kernel/include/ksu.h" || echo "via-symlink path missing"
+
         echo "== verify integrated KernelSU =="
         KSU_MARKERS="$(
           find -L "$COMMON_DIR" \
