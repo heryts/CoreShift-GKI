@@ -249,6 +249,8 @@ runs:
           fi
 
         elif [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== ensuring base KSU config is enabled (SUSFS Kconfig depends on it) =="
+          add_config KSU y
           case "${{ inputs.kernel_version }}" in
             5.10)
               SUSFS_PATCH_DIR="${GITHUB_WORKSPACE}/.github/patches/susfs4ksu/gki-android12-5.10"
