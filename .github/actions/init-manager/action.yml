@@ -41,21 +41,6 @@ runs:
         echo "common_dir=$COMMON_DIR"
 
         git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
-
-        if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
-          echo "== KernelSU-Next + SUSFS: fresh clone of pershoot/KernelSU-Next (not reusing old submodule checkout) =="
-          echo "NOTE: fork maintainer states this is not production-ready; use at your own risk."
-          echo "A fresh clone avoids setup.sh's internal git-pull colliding with the old"
-          echo "upstream history left over from the original submodule checkout."
-
-          PERSHOOT_BRANCH="next-susfs"
-
-          rm -rf "manager/${MANAGER}"
-          git clone --branch "$PERSHOOT_BRANCH" --depth 1 "https://github.com/pershoot/KernelSU-Next.git" "manager/${MANAGER}"
-
-          PERSHOOT_HEAD="$(git -C "manager/${MANAGER}" rev-parse HEAD)"
-          echo "cloned pershoot/KernelSU-Next @ ${PERSHOOT_BRANCH} (resolved: ${PERSHOOT_HEAD})"
-        fi
         
         if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== KSUN-Susfs-Hookless: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
@@ -189,8 +174,8 @@ runs:
         fi
 
         if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
-          echo "== calling setup.sh with explicit branch arg to avoid internal git pull conflicts =="
-          bash "$SETUP_SCRIPT" "$PERSHOOT_BRANCH"
+          echo "== calling setup.sh with dev-susfs (official pre-integrated SUSFS branch) =="
+          bash "$SETUP_SCRIPT" "dev-susfs"
         elif [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
           bash "$SETUP_SCRIPT" "$SELECTED_MANAGER_REF"
         else
