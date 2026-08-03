@@ -189,7 +189,10 @@ runs:
           echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
         fi
 
-        if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
+        if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== calling setup.sh with explicit branch arg to avoid internal git pull conflicts =="
+          bash "$SETUP_SCRIPT" "$PERSHOOT_BRANCH"
+        elif [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
           bash "$SETUP_SCRIPT" "$SELECTED_MANAGER_REF"
         else
           bash "$SETUP_SCRIPT"
