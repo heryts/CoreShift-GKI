@@ -154,7 +154,7 @@ runs:
         cd "$KSU_ROOT"
 
         echo
-        if [ "${{ inputs.manager }}" = "ResukiSU" ] || [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+        if [ "${{ inputs.manager }}" = "ResukiSU" ]; then
           echo "== skipping generic KernelSU SUSFS enablement patch =="
           echo "manager=${{ inputs.manager }} has its own SUSFS wiring built into its source."
         else
