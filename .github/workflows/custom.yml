@@ -367,6 +367,34 @@ jobs:
         uses: ./.github/actions/apply-unicode-fix
         with:
           kernel_version: ${{ inputs.kernel_version }}
+
+      - name: Derive FUSE-BPF version vars
+        id: fuse-bpf-vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.kernel_version }}" in
+            5.10) ANDROID_VERSION="android12" ;;
+            6.1)  ANDROID_VERSION="android14" ;;
+            6.6)  ANDROID_VERSION="android15" ;;
+            6.12) ANDROID_VERSION="android16" ;;
+            *)
+              echo "::error::unsupported kernel_version for FUSE-BPF: ${{ inputs.kernel_version }}"
+              exit 1
+              ;;
+          esac
+          VERSION="${ANDROID_VERSION}-${{ inputs.kernel_version }}"
+          {
+            echo "android_version=$ANDROID_VERSION"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build FUSE-BPF Userspace Daemon
+        uses: ./.github/actions/build-fuse-bpf
+        with:
+          version: ${{ steps.fuse-bpf-vars.outputs.version }}
+          kernel_version: ${{ inputs.kernel_version }}
+          android_version: ${{ steps.fuse-bpf-vars.outputs.android_version }}
           
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
