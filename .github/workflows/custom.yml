@@ -318,12 +318,6 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: DEBUG check fuse selftest dir
-        shell: bash
-        run: |
-          find "${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}/tools/testing/selftests/filesystems" -maxdepth 1 2>&1 || echo "filesystems dir not found"
-          ls "${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}/tools/testing/selftests/" 2>&1 | head -30 || echo "selftests dir not found"
-          
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KSUN-Susfs-Hookless'
         uses: ./.github/actions/apply-susfs
@@ -374,34 +368,6 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Derive FUSE-BPF version vars
-        id: fuse-bpf-vars
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "${{ inputs.kernel_version }}" in
-            5.10) ANDROID_VERSION="android12" ;;
-            6.1)  ANDROID_VERSION="android14" ;;
-            6.6)  ANDROID_VERSION="android15" ;;
-            6.12) ANDROID_VERSION="android16" ;;
-            *)
-              echo "::error::unsupported kernel_version for FUSE-BPF: ${{ inputs.kernel_version }}"
-              exit 1
-              ;;
-          esac
-          VERSION="${ANDROID_VERSION}-${{ inputs.kernel_version }}"
-          {
-            echo "android_version=$ANDROID_VERSION"
-            echo "version=$VERSION"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build FUSE-BPF Userspace Daemon
-        uses: ./.github/actions/build-fuse-bpf
-        with:
-          version: ${{ steps.fuse-bpf-vars.outputs.version }}
-          kernel_version: ${{ inputs.kernel_version }}
-          android_version: ${{ steps.fuse-bpf-vars.outputs.android_version }}
-          
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
