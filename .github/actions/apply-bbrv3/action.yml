@@ -39,9 +39,3 @@ runs:
         fi
 
         echo "BBRv3 patches applied for version=${{ inputs.version }}"
-
-    - name: Enable BBRv3 Kernel Config
-      uses: ./.github/actions/set-kernel-config
-      with:
-        config_list: |
-          CONFIG_TCP_CONG_BBR3=y
