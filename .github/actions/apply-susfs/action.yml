@@ -114,6 +114,14 @@ runs:
 
         git apply "$SUSFS_PATCH"
 
+        if [ "${{ inputs.manager }}" = "KernelSU-Next" ]; then
+          echo "== fixing set_nameidata() call-site/declaration mismatch =="
+          echo "50_add_susfs_in_*.patch adds a 4th arg at call sites but this source tree's"
+          echo "set_nameidata() declaration wasn't updated to accept it; strip the extra arg."
+          sed -i -E 's/set_nameidata\(([^,]+), ([^,]+), ([^,]+), NULL\);/set_nameidata(\1, \2, \3);/' fs/namei.c
+          grep -n 'set_nameidata(' fs/namei.c
+        fi
+
         if find . -name '*.rej' -print -quit | grep -q .; then
           echo "::error::reject files found after SUSFS patch"
           find . -name '*.rej' -print
