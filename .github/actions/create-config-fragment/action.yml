@@ -346,6 +346,9 @@ runs:
           fi
         fi
 
+        echo "== enabling BBRv3 TCP congestion control =="
+          add_config TCP_CONG_BBR3 y
+
         echo "== private.fragment =="
         cat private.fragment
 
