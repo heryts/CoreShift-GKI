@@ -363,6 +363,11 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Apply Unicode Fix Patch
+        uses: ./.github/actions/apply-unicode-fix
+        with:
+          kernel_version: ${{ inputs.kernel_version }}
+          
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
@@ -384,19 +389,6 @@ jobs:
           baseband_guard: ${{ inputs.baseband_guard }}
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: DEBUG check THREAD_INFO_IN_TASK dependency
-        if: inputs.manager == 'KernelSU-Next' && inputs.susfs == 'on'
-        shell: bash
-        run: |
-          set -euo pipefail
-          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
-          echo "== THREAD_INFO_IN_TASK Kconfig definition =="
-          grep -rn -B3 -A3 'config THREAD_INFO_IN_TASK' "$COMMON_DIR"/arch/arm64/Kconfig 2>/dev/null || echo "not found in arch/arm64/Kconfig"
-          echo "== searching whole tree for the symbol =="
-          grep -rln 'THREAD_INFO_IN_TASK' "$COMMON_DIR" 2>/dev/null | head -20
-          echo "== KSU_SUSFS full Kconfig block from manager source =="
-          grep -n -B3 -A20 'config KSU_SUSFS$' "$COMMON_DIR"/KernelSU-Next/kernel/Kconfig 2>/dev/null || echo "not found at expected path"
-          
       - name: Apply IPC KABI patches
         if: inputs.container_features == 'on'
         uses: ./.github/actions/apply-ipc-kabi-patches
