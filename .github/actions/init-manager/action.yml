@@ -41,7 +41,14 @@ runs:
         echo "common_dir=$COMMON_DIR"
 
         git submodule update --init --remote --depth 1 --single-branch "manager/${MANAGER}"
-        
+
+        if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== KernelSU-Next + SUSFS: switching to pershoot/KernelSU-Next dev-susfs branch =="
+          rm -rf "manager/${MANAGER}"
+          git clone --branch "dev-susfs" --depth 1 "https://github.com/pershoot/KernelSU-Next.git" "manager/${MANAGER}"
+          echo "cloned pershoot/KernelSU-Next @ dev-susfs"
+        fi
+
         if [ "$MANAGER" = "KSUN-Susfs-Hookless" ]; then
           echo "== KSUN-Susfs-Hookless: using MirahSyakilla/KSUN fork (pinned via .gitmodules) =="
           echo "repo already pinned via .gitmodules (susfs+nomount-hookless branch)"
