@@ -288,6 +288,11 @@ runs:
           else
             echo "$SUSFS_CONFIGS" | while read -r key; do
               [ -z "$key" ] && continue
+              if [ "${{ inputs.manager }}" = "KernelSU-Next" ] && [ "$key" = "KSU_SUSFS_OPEN_REDIRECT" ]; then
+                echo "skipping KSU_SUSFS_OPEN_REDIRECT for manager=KernelSU-Next"
+                echo "(this fork's fs/namei.c set_nameidata() lacks the 4th param OPEN_REDIRECT needs)"
+                continue
+              fi
               add_config "$key" y
             done
           fi
