@@ -106,9 +106,6 @@ runs:
           grep -qE "^[[:space:]]*config[[:space:]]+${symbol}\$" "$kconfig_file"
         }
 
-        echo "== enabling FUSE_BPF (required for FUSE-BPF userspace daemon) =="
-        add_config FUSE_BPF y
-
         if [ "${{ inputs.ikconfig }}" = "on" ]; then
         if [ "${{ inputs.ikconfig }}" = "on" ]; then
           add_config IKCONFIG y
