@@ -180,7 +180,10 @@ runs:
           echo "linked $COMMON_DIR/KernelSU-Next -> $MANAGER_DIR"
         fi
 
-        if [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
+        if [ "$MANAGER" = "KernelSU-Next" ] && [ "${{ inputs.susfs }}" = "on" ]; then
+          echo "== calling setup.sh with dev-susfs explicitly to prevent it from switching to latest tag =="
+          bash "$SETUP_SCRIPT" "dev-susfs"
+        elif [ -n "$SELECTED_MANAGER_REF" ] && { [ "$MANAGER" = "KernelSU" ] || [ "$MANAGER" = "KowSU" ] || [ "$MANAGER" = "KernelSU-Backslashxx" ]; }; then
           bash "$SETUP_SCRIPT" "$SELECTED_MANAGER_REF"
         else
           bash "$SETUP_SCRIPT"
