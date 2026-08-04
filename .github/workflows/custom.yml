@@ -318,6 +318,12 @@ jobs:
           susfs: ${{ inputs.susfs }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: DEBUG check fuse selftest dir
+        shell: bash
+        run: |
+          find "${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}/tools/testing/selftests/filesystems" -maxdepth 1 2>&1 || echo "filesystems dir not found"
+          ls "${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}/tools/testing/selftests/" 2>&1 | head -30 || echo "selftests dir not found"
+          
       - name: Apply SUSFS4KSU patches
         if: inputs.susfs == 'on' && inputs.manager != 'KSUN-Susfs-Hookless'
         uses: ./.github/actions/apply-susfs
