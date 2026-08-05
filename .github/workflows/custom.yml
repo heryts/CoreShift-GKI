@@ -408,7 +408,7 @@ jobs:
           echo "sublevel=$SUBLEVEL" >> "$GITHUB_OUTPUT"
           echo "derived sublevel: $SUBLEVEL"
 
-       - name: Setup Networking
+      - name: Setup Networking
         uses: ./.github/actions/networking
         with:
           version: ${{ steps.derive-version.outputs.version }}
