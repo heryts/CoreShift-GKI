@@ -457,12 +457,7 @@ jobs:
           else
             echo "tcp_cong_avoid_ai already in KMI symbol list"
           fi
-
-      - name: Setup CIFS Configs
-        uses: ./.github/actions/apply-cifs
-        with:
-          version: ${{ steps.derive-version.outputs.version }}
-          
+ 
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
         with:
