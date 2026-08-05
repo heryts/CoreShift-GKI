@@ -110,11 +110,6 @@ runs:
         add_config TCP_CONG_ADVANCED y
         add_config TCP_CONG_BBR3 y
 
-        echo "== disabling other TCP_CONG_ADVANCED submenu modules (not in GKI ABI whitelist) =="
-        add_config TCP_BIC n
-        add_config TCP_HTCP n
-        add_config TCP_WESTWOOD n
-
         if [ "${{ inputs.ikconfig }}" = "on" ]; then
           add_config IKCONFIG y
           add_config IKCONFIG_PROC y
