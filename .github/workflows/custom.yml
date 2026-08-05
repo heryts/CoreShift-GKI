@@ -438,6 +438,25 @@ jobs:
 
           echo "== final whitelist =="
           cat "$WHITELIST"
+
+      - name: Whitelist BBRv3 required KMI symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          SYMBOL_LIST="$COMMON_DIR/android/abi_gki_aarch64"
+
+          if [ ! -f "$SYMBOL_LIST" ]; then
+            echo "::error::KMI symbol list not found: $SYMBOL_LIST"
+            exit 1
+          fi
+
+          if ! grep -qxF "  tcp_cong_avoid_ai" "$SYMBOL_LIST"; then
+            echo "  tcp_cong_avoid_ai" >> "$SYMBOL_LIST"
+            echo "added tcp_cong_avoid_ai to KMI symbol list"
+          else
+            echo "tcp_cong_avoid_ai already in KMI symbol list"
+          fi
           
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
