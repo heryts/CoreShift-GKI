@@ -59,10 +59,18 @@ runs:
         if git cherry-pick -x --keep-redundant-commits "$FUSE_BPF_5_10_SHA"; then
           echo "== fuse-bpf v1.1 applied cleanly =="
         else
-          echo "::error::fuse-bpf v1.1 cherry-pick hit conflicts (expected if this 5.10 tree has diverged from android12-5.10 stock)."
-          echo "::error::Conflicting files:"
+          echo "::error::fuse-bpf v1.1 cherry-pick hit conflicts (expected: this 5.10 tree has diverged textually from the android13-5.10 snapshot the squash was cut from)."
+          echo "::group::Conflicting files"
           git diff --name-only --diff-filter=U || true
-          echo "::error::Resolve manually: pull this branch locally, run the same 'git fetch + cherry-pick' commands, fix conflicts in fs/fuse/*.c and fs/fuse/fuse_i.h, then push a resolved patch and swap it in here."
+          echo "::endgroup::"
+
+          for f in $(git diff --name-only --diff-filter=U); do
+            echo "::group::CONFLICT HUNKS: $f"
+            grep -n -A5 -B5 '^<<<<<<<\|^=======\|^>>>>>>>' "$f" || true
+            echo "::endgroup::"
+          done
+
+          echo "::error::Copy the 'CONFLICT HUNKS' blocks above (per file) and resolve them, then update this action's cherry-pick step with the fixed patch."
           git cherry-pick --abort || true
           exit 1
         fi
