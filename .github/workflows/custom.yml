@@ -638,7 +638,6 @@ jobs:
           - LTO: ${{ inputs.lto }}
           - SUSFS: ${susfs_label}
           - BBG: ${bbg_label}
-          - FUSE-BPF: Enabled
           - Date: ${DATE}
 
           Configs, raw images, and compiler metadata are available in workflow artifacts, not release assets.
