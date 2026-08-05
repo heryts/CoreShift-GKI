@@ -107,6 +107,7 @@ runs:
         }
 
         echo "== enabling BBRv3 TCP congestion control =="
+        add_config TCP_CONG_ADVANCED y
         add_config TCP_CONG_BBR3 y
 
         echo "== enabling CIFS Configs =="
