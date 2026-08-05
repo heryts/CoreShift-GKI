@@ -110,6 +110,14 @@ runs:
         add_config TCP_CONG_ADVANCED y
         add_config TCP_CONG_BBR3 y
 
+        echo "== enabling CIFS Configs =="
+        add_config CIFS y
+        add_config NETWORK_FILESYSTEMS y
+        add_config NETFS_SUPPORT y
+        add_config KEYS y
+        add_config CIFS_XATTR y
+        add_config CIFS_POSIX y
+        
         if [ "${{ inputs.ikconfig }}" = "on" ]; then
           add_config IKCONFIG y
           add_config IKCONFIG_PROC y
