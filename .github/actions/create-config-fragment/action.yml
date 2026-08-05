@@ -119,7 +119,6 @@ runs:
         add_config CIFS_POSIX y
 
         echo "== enabling networking-related kernel configuration options =="
-        
         echo "== enabling IP Set & Firewall Configs =="
         add_config IP_SET y
         add_config IP_SET_MAX 65534
