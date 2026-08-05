@@ -427,7 +427,7 @@ jobs:
             exit 1
           fi
 
-          for mod in "net/ipv4/tcp_bic.ko" "net/ipv4/tcp_htcp.ko" "net/ipv4/tcp_westwood.ko"; do
+          for mod in "net/ipv4/tcp_bic.ko" "net/ipv4/tcp_westwood.ko" "net/ipv4/tcp_htcp.ko"; do
             if ! grep -qxF "$mod" "$WHITELIST"; then
               echo "$mod" >> "$WHITELIST"
               echo "added $mod to whitelist"
