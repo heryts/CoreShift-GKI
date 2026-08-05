@@ -15,13 +15,13 @@ runs:
   using: "composite"
   steps:
     - name: Apply BBRv3 Patches
-      uses: ./.github/actions/bbrv3
+      uses: ./.github/actions/apply-bbrv3
       with:
         version: ${{ steps.derive-version.outputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
         sublevel: ${{ steps.kernel-sublevel.outputs.sublevel }}
 
     - name: Setup CIFS Configs
-      uses: ./.github/actions/cifs
+      uses: ./.github/actions/apply-cifs
       with:
         version: ${{ steps.derive-version.outputs.version }}
