@@ -335,6 +335,7 @@ runs:
         fi
 
         echo "== enabling BBRv3 TCP congestion control =="
+        add_config TCP_CONG_ADVANCED y
         add_config TCP_CONG_BBR3 y
 
         if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
