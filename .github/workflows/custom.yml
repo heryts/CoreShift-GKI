@@ -367,7 +367,7 @@ jobs:
         uses: ./.github/actions/apply-unicode-fix
         with:
           kernel_version: ${{ inputs.kernel_version }}
-
+          
       - name: Fix CONFIG_IP_SET_MAX limit (5.10)
         if: inputs.kernel_version == '5.10'
         shell: bash
@@ -415,11 +415,6 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           sublevel: ${{ steps.kernel-sublevel.outputs.sublevel }}
 
-      - name: Setup CIFS Configs
-        uses: ./.github/actions/apply-cifs
-        with:
-          version: ${{ steps.derive-version.outputs.version }}
-
       - name: Whitelist BBRv3 side-effect modules for GKI ABI check
         shell: bash
         run: |
@@ -462,6 +457,11 @@ jobs:
           else
             echo "tcp_cong_avoid_ai already in KMI symbol list"
           fi
+
+      - name: Setup CIFS Configs
+        uses: ./.github/actions/apply-cifs
+        with:
+          version: ${{ steps.derive-version.outputs.version }}
           
       - name: Create private config fragment
         uses: ./.github/actions/create-config-fragment
