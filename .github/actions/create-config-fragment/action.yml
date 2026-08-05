@@ -106,20 +106,7 @@ runs:
           grep -qE "^[[:space:]]*config[[:space:]]+${symbol}\$" "$kconfig_file"
         }
 
-        echo "== enabling BBRv3 TCP congestion control =="
-        add_config TCP_CONG_ADVANCED y
-        add_config TCP_CONG_BBR3 y
-
-        echo "== enabling CIFS Configs =="
-        add_config CIFS y
-        add_config NETWORK_FILESYSTEMS y
-        add_config NETFS_SUPPORT y
-        add_config KEYS y
-        add_config CIFS_XATTR y
-        add_config CIFS_POSIX y
-
         echo "== enabling networking-related kernel configuration options =="
-        
         echo "== enabling IP Set & Firewall Configs =="
         add_config IP_SET y
         add_config IP_SET_MAX 65534
@@ -172,6 +159,17 @@ runs:
         echo "== enabling Wireguard VPN Configs =="
         add_config WIREGUARD y
         
+        echo "== enabling BBRv3 TCP congestion control =="
+        add_config TCP_CONG_BBR3 y
+
+        echo "== enabling CIFS Configs =="
+        add_config CIFS y
+        add_config NETWORK_FILESYSTEMS y
+        add_config NETFS_SUPPORT y
+        add_config KEYS y
+        add_config CIFS_XATTR y
+        add_config CIFS_POSIX y
+
         if [ "${{ inputs.ikconfig }}" = "on" ]; then
           add_config IKCONFIG y
           add_config IKCONFIG_PROC y
