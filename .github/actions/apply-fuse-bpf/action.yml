@@ -1,13 +1,17 @@
 name: "Apply FUSE-BPF support"
 description: >
-  Ensures CONFIG_FUSE_BPF support is present in kernel/common.
-  fuse-bpf ships natively in Google's android14-6.1 and android15-6.6 GKI
-  branches, but NOT in android12-5.10 (the branch this project uses for
-  kernel_version=5.10). This action detects which case applies and either
-  (a) skips patching and just makes sure the Kconfig option is enabled, or
-  (b) cherry-picks the official Google squash patch (fuse-bpf v1.1,
+  Ensures the fuse-bpf source (fs/fuse/backing.c, bpf_fuse.c, etc.) is present
+  in kernel/common. fuse-bpf ships natively in Google's android14-6.1 and
+  android15-6.6 GKI branches, but NOT in android12-5.10 (the branch this
+  project uses for kernel_version=5.10). This action detects which case
+  applies and either (a) skips patching because the source is already native,
+  or (b) cherry-picks the official Google squash patch (fuse-bpf v1.1,
   commit f5f4199c102aa676998b42abff60d071385c1c0c from
   android.googlesource.com/kernel/common) on top of a 5.10 tree that lacks it.
+
+  This action only touches source. The CONFIG_FUSE_BPF Kconfig toggle itself
+  is written by create-config-fragment (private.fragment / private.required),
+  same as every other feature in this project.
 
 inputs:
   kernel_version:
@@ -30,25 +34,9 @@ runs:
       run: |
         set -euo pipefail
 
-        DEFCONFIG="arch/arm64/configs/gki_defconfig"
-
-        ensure_config_on() {
-          if [ ! -f "$DEFCONFIG" ]; then
-            echo "::error::defconfig not found at $DEFCONFIG"
-            exit 1
-          fi
-          if grep -qxF "CONFIG_FUSE_BPF=y" "$DEFCONFIG"; then
-            echo "CONFIG_FUSE_BPF already enabled in $DEFCONFIG"
-          else
-            echo "CONFIG_FUSE_BPF=y" >> "$DEFCONFIG"
-            echo "added CONFIG_FUSE_BPF=y to $DEFCONFIG"
-          fi
-        }
-
         if [ -f "fs/fuse/backing.c" ] && grep -q "CONFIG_FUSE_BPF" "fs/fuse/Kconfig" 2>/dev/null; then
           echo "== fuse-bpf source already present in this tree (native GKI support) =="
-          echo "== skipping patch, only verifying Kconfig default =="
-          ensure_config_on
+          echo "== nothing to patch; CONFIG_FUSE_BPF will be toggled by create-config-fragment =="
           exit 0
         fi
 
@@ -71,13 +59,21 @@ runs:
         if git cherry-pick -x --keep-redundant-commits "$FUSE_BPF_5_10_SHA"; then
           echo "== fuse-bpf v1.1 applied cleanly =="
         else
-          echo "::error::fuse-bpf v1.1 cherry-pick hit conflicts (expected if this 5.10 tree has diverged from android12-5.10 stock)."
-          echo "::error::Conflicting files:"
+          echo "::error::fuse-bpf v1.1 cherry-pick hit conflicts (expected: this 5.10 tree has diverged textually from the android13-5.10 snapshot the squash was cut from)."
+          echo "::group::Conflicting files"
           git diff --name-only --diff-filter=U || true
-          echo "::error::Resolve manually: pull this branch locally, run the same 'git fetch + cherry-pick' commands, fix conflicts in fs/fuse/*.c and fs/fuse/fuse_i.h, then push a resolved patch and swap it in here."
+          echo "::endgroup::"
+
+          for f in $(git diff --name-only --diff-filter=U); do
+            echo "::group::CONFLICT HUNKS: $f"
+            grep -n -A5 -B5 '^<<<<<<<\|^=======\|^>>>>>>>' "$f" || true
+            echo "::endgroup::"
+          done
+
+          echo "::error::Copy the 'CONFLICT HUNKS' blocks above (per file) and resolve them, then update this action's cherry-pick step with the fixed patch."
           git cherry-pick --abort || true
           exit 1
         fi
-        ensure_config_on
 
         echo "== fuse-bpf backport complete for kernel_version=${KVER} =="
+
