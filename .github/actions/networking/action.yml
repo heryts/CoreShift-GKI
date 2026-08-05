@@ -14,9 +14,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup Networking Configs
-      uses: ./.github/actions/networking-config
-
     - name: Apply BBRv3 Patches
       uses: ./.github/actions/bbrv3
       with:
