@@ -408,12 +408,17 @@ jobs:
           echo "sublevel=$SUBLEVEL" >> "$GITHUB_OUTPUT"
           echo "derived sublevel: $SUBLEVEL"
 
-      - name: Setup Networking
-        uses: ./.github/actions/networking
+      - name: Apply BBRv3 Patches
+        uses: ./.github/actions/apply-bbrv3
         with:
           version: ${{ steps.derive-version.outputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
           sublevel: ${{ steps.kernel-sublevel.outputs.sublevel }}
+
+      - name: Setup CIFS Configs
+        uses: ./.github/actions/apply-cifs
+        with:
+          version: ${{ steps.derive-version.outputs.version }}
 
       - name: Whitelist BBRv3 side-effect modules for GKI ABI check
         shell: bash
