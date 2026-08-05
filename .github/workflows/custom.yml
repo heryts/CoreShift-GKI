@@ -408,8 +408,8 @@ jobs:
           echo "sublevel=$SUBLEVEL" >> "$GITHUB_OUTPUT"
           echo "derived sublevel: $SUBLEVEL"
 
-      - name: Apply BBRv3 Patches
-        uses: ./.github/actions/apply-bbrv3
+       - name: Setup Networking
+        uses: ./.github/actions/networking
         with:
           version: ${{ steps.derive-version.outputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
