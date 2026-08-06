@@ -516,6 +516,8 @@ jobs:
 
       - name: Build kernel
         uses: ./.github/actions/build-kernel
+        env:
+          TRIM_NONALLOWED_MODS: 0
         with:
           lto: ${{ inputs.lto }}
           kernel_version: ${{ inputs.kernel_version }}
