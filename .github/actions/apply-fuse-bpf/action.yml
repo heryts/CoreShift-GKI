@@ -1,17 +1,5 @@
 name: "Apply FUSE-BPF support"
-description: >
-  Ensures the fuse-bpf source (fs/fuse/backing.c, bpf_fuse.c, etc.) is present
-  in kernel/common. fuse-bpf ships natively in Google's android14-6.1 and
-  android15-6.6 GKI branches, but NOT in android12-5.10 (the branch this
-  project uses for kernel_version=5.10). This action detects which case
-  applies and either (a) skips patching because the source is already native,
-  or (b) cherry-picks the official Google squash patch (fuse-bpf v1.1,
-  commit f5f4199c102aa676998b42abff60d071385c1c0c from
-  android.googlesource.com/kernel/common) on top of a 5.10 tree that lacks it.
-
-  This action only touches source. The CONFIG_FUSE_BPF Kconfig toggle itself
-  is written by create-config-fragment (private.fragment / private.required),
-  same as every other feature in this project.
+description: "Applies FUSE-BPF patch using local patch file or skips if natively present."
 
 inputs:
   kernel_version:
@@ -21,85 +9,33 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Attempt fuse-bpf cherry-pick
-      id: cherrypick
+    - name: Apply FUSE-BPF Patch
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      env:
-        KVER: ${{ inputs.kernel_version }}
-        FUSE_BPF_5_10_SHA: f5f4199c102aa676998b42abff60d071385c1c0c
-        FUSE_BPF_5_10_REMOTE: https://android.googlesource.com/kernel/common
       run: |
         set -euo pipefail
 
         if [ -f "fs/fuse/backing.c" ] && grep -q "CONFIG_FUSE_BPF" "fs/fuse/Kconfig" 2>/dev/null; then
-          echo "== fuse-bpf source already present in this tree (native GKI support) =="
-          echo "== nothing to patch; CONFIG_FUSE_BPF will be toggled by create-config-fragment =="
-          echo "conflict=false" >> "$GITHUB_OUTPUT"
+          echo "== FUSE-BPF source already present in this tree (native GKI support) =="
+          echo "== Nothing to patch =="
           exit 0
         fi
 
-        echo "== fuse-bpf not found in this tree =="
+        echo "== FUSE-BPF not found in source tree =="
 
-        if [ "$KVER" != "5.10" ]; then
-          echo "::error::fuse-bpf is missing from this kernel_version=${KVER} source tree, and no verified backport squash is bundled for 6.1/6.6 in this action."
-          echo "::error::android14-6.1 and android15-6.6 ship fuse-bpf natively upstream, so this usually means source_mode=maintained or source_mode=custom points at a tree that stripped it out."
-          echo "conflict=false" >> "$GITHUB_OUTPUT"
+        if [ "${{ inputs.kernel_version }}" != "5.10" ]; then
+          echo "::error::FUSE-BPF is missing from kernel_version=${{ inputs.kernel_version }} source tree."
           exit 1
         fi
 
-        echo "== backporting fuse-bpf v1.1 squash from android13-5.10 onto this android12-5.10-based tree =="
+        PATCH_FILE="${GITHUB_WORKSPACE}/.github/patches/common/fuse-bpf/*.patch"
 
-        git config user.email "ci@coreshift.local"
-        git config user.name "CoreShift CI"
-
-        git fetch --depth=50 "$FUSE_BPF_5_10_REMOTE" "$FUSE_BPF_5_10_SHA"
-
-        if git cherry-pick -x --keep-redundant-commits "$FUSE_BPF_5_10_SHA"; then
-          echo "== fuse-bpf v1.1 applied cleanly =="
-          echo "conflict=false" >> "$GITHUB_OUTPUT"
+        if compgen -G "$PATCH_FILE" > /dev/null; then
+          echo "== Applying local FUSE-BPF patch from .github/patches/common/fuse-bpf/ =="
+          git apply --check $PATCH_FILE || patch -p1 --dry-run < $PATCH_FILE
+          git apply $PATCH_FILE || patch -p1 < $PATCH_FILE
+          echo "== FUSE-BPF patch applied successfully! =="
         else
-          echo "::error::fuse-bpf v1.1 cherry-pick hit conflicts (expected: this 5.10 tree has diverged textually from the android13-5.10 snapshot the squash was cut from)."
-          echo "::group::Conflicting files"
-          git diff --name-only --diff-filter=U || true
-          echo "::endgroup::"
-          # Deliberately NOT aborting here: leave the conflict markers in the
-          # working tree so the next step can package the FULL files (not a
-          # truncated grep window) for download.
-          echo "conflict=true" >> "$GITHUB_OUTPUT"
+          echo "::error::No patch file found in .github/patches/common/fuse-bpf/"
           exit 1
         fi
-
-    - name: Package conflicted files for download
-      if: failure() && steps.cherrypick.outputs.conflict == 'true'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -euo pipefail
-        mkdir -p "$RUNNER_TEMP/fuse-bpf-conflicts"
-        for f in $(git diff --name-only --diff-filter=U); do
-          dest="$RUNNER_TEMP/fuse-bpf-conflicts/$f"
-          mkdir -p "$(dirname "$dest")"
-          cp "$f" "$dest"
-          echo "packaged: $f"
-        done
-        # Also drop the pre-conflict (fuse-bpf v1.1 patch) and base tree info
-        # so a full 3-way resolution can be reproduced exactly if needed.
-        git status --porcelain=v1 > "$RUNNER_TEMP/fuse-bpf-conflicts/_git-status.txt" || true
-
-    - name: Upload conflicted files artifact
-      if: failure() && steps.cherrypick.outputs.conflict == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: fuse-bpf-conflicts-${{ inputs.kernel_version }}
-        path: ${{ runner.temp }}/fuse-bpf-conflicts
-        if-no-files-found: warn
-
-    - name: Abort cherry-pick
-      if: failure() && steps.cherrypick.outputs.conflict == 'true'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        git cherry-pick --abort || true
-        echo "::error::fuse-bpf v1.1 conflicts were NOT auto-resolved. Full conflicted files (with <<<<<<< markers) were uploaded as the 'fuse-bpf-conflicts-${{ inputs.kernel_version }}' artifact on this run — download it, resolve, and either commit a permanent patch or hand the resolved files back for review."
-
