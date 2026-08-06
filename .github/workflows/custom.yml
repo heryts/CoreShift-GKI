@@ -415,30 +415,6 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           sublevel: ${{ steps.kernel-sublevel.outputs.sublevel }}
 
-      - name: Whitelist BBRv3 side-effect modules for GKI ABI check
-        shell: bash
-        run: |
-          set -euo pipefail
-          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
-          WHITELIST="$COMMON_DIR/android/gki_aarch64_modules"
-
-          if [ ! -f "$WHITELIST" ]; then
-            echo "::error::whitelist file not found: $WHITELIST"
-            exit 1
-          fi
-
-          for mod in "net/ipv4/tcp_bic.ko" "net/ipv4/tcp_westwood.ko" "net/ipv4/tcp_htcp.ko"; do
-            if ! grep -qxF "$mod" "$WHITELIST"; then
-              echo "$mod" >> "$WHITELIST"
-              echo "added $mod to whitelist"
-            else
-              echo "$mod already in whitelist"
-            fi
-          done
-
-          echo "== final whitelist =="
-          cat "$WHITELIST"
-
       - name: Whitelist BBRv3 required KMI symbols
         shell: bash
         run: |
