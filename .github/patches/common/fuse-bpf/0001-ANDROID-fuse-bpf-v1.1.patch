@@ -200,7 +200,6 @@ index 000000000..4f0044e5f
 +#include "fuse_i.h"
 +
 +#include <linux/fdtable.h>
-+#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/fs_stack.h>
 +#include <linux/namei.h>
@@ -2728,7 +2727,6 @@ index bf1b5c02b..7e508077f 100644
 +#include <linux/fdtable.h>
  #include <linux/pagemap.h>
  #include <linux/file.h>
-+#include <linux/bpf.h>
 +#include <linux/filter.h>
  #include <linux/fs_context.h>
  #include <linux/sched.h>
@@ -3610,7 +3608,6 @@ index c64b3e0ff..803e89192 100644
  
  #include "fuse_i.h"
  
-+#include <linux/bpf.h>
 +#include <linux/filter.h>
  #include <linux/pagemap.h>
  #include <linux/slab.h>
@@ -3838,11 +3835,12 @@ index 352b23fa0..a49360182 100644
  
 +#include <linux/android_fuse.h>
 +#include <linux/bpf.h>
-+#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/pagemap.h>
  #include <linux/fuse.h>
  #include <linux/fs.h>
++#include <linux/bpf.h>
++#include <linux/filter.h>
  #include <linux/mount.h>
 @@ -31,6 +34,9 @@
  #include <linux/pid_namespace.h>
@@ -3962,7 +3960,10 @@ index 352b23fa0..a49360182 100644
 @@ -769,6 +833,15 @@ struct fuse_conn {
  	/** Passthrough mode for read/write IO */
  	unsigned int passthrough:1;
- 
+
++	/* Support killpriv v2 */
++	unsigned int handle_killpriv_v2:1;
++
 +	/* Propagate syncfs() to server */
 +	unsigned int sync_fs:1;
 +
@@ -5554,7 +5555,6 @@ index 000000000..c6aa670bc
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2021 Google LLC
 +
-+#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/android_fuse.h>
 +#include <linux/bpf.h>
