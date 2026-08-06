@@ -164,6 +164,9 @@ runs:
         echo "== enabling CIFS =="
         add_config CIFS y
         add_config NETWORK_FILESYSTEMS y
+        if [ "${{ inputs.kernel_version }}" != "5.10" ]; then
+          add_config NETFS_SUPPORT y
+        fi
         add_config KEYS y
         add_config CIFS_XATTR y
         add_config CIFS_POSIX y
