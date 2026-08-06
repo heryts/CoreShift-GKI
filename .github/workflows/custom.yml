@@ -91,7 +91,7 @@ on:
         options: ["on", "off"]
         default: "off"
       add_nomount_maxsteeel:
-        description: "NoMount_support (On:maxsteeel-nomount, Off:MirahSyakilla-nomount (KSUN-Hookless-Only)"
+        description: "NoMount_support (On:maxsteeel-nomount, Off:KSUN-Hookless-Only)"
         type: choice
         required: true
         options: ["off", "on"]
