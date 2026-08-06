@@ -369,10 +369,12 @@ runs:
         if [ "${{ inputs.baseband_guard }}" = "on" ]; then
           add_config BBG y
         fi
-
+        
         echo "== FUSE-BPF config (always enabled; source ensured by apply-fuse-bpf) =="
         add_config BPF_SYSCALL y
         add_config BPF_JIT y
+        add_config BPF_STREAM_PARSER y
+        add_config NET_CLS_ACT y
 
         if grep -qxF "CONFIG_FUSE_FS=y" private.fragment 2>/dev/null; then
           echo "  FUSE_FS already requested via mount_filesystems"
