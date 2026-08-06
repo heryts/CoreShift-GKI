@@ -200,6 +200,7 @@ index 000000000..4f0044e5f
 +#include "fuse_i.h"
 +
 +#include <linux/fdtable.h>
++#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/fs_stack.h>
 +#include <linux/namei.h>
@@ -2727,6 +2728,7 @@ index bf1b5c02b..7e508077f 100644
 +#include <linux/fdtable.h>
  #include <linux/pagemap.h>
  #include <linux/file.h>
++#include <linux/bpf.h>
 +#include <linux/filter.h>
  #include <linux/fs_context.h>
  #include <linux/sched.h>
@@ -3608,6 +3610,7 @@ index c64b3e0ff..803e89192 100644
  
  #include "fuse_i.h"
  
++#include <linux/bpf.h>
 +#include <linux/filter.h>
  #include <linux/pagemap.h>
  #include <linux/slab.h>
@@ -3834,6 +3837,7 @@ index 352b23fa0..a49360182 100644
  #endif
  
 +#include <linux/android_fuse.h>
++#include <linux/bpf.h>
 +#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/pagemap.h>
@@ -5550,6 +5554,7 @@ index 000000000..c6aa670bc
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2021 Google LLC
 +
++#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/android_fuse.h>
 +#include <linux/bpf.h>
