@@ -3834,6 +3834,7 @@ index 352b23fa0..a49360182 100644
  #endif
  
 +#include <linux/android_fuse.h>
++#include <linux/bpf.h>
 +#include <linux/filter.h>
 +#include <linux/pagemap.h>
  #include <linux/fuse.h>
@@ -5551,6 +5552,7 @@ index 000000000..c6aa670bc
 +
 +#include <linux/filter.h>
 +#include <linux/android_fuse.h>
++#include <linux/bpf.h>
 +
 +static const struct bpf_func_proto *
 +fuse_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
