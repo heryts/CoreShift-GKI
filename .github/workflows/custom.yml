@@ -416,6 +416,7 @@ jobs:
           sublevel: ${{ steps.kernel-sublevel.outputs.sublevel }}
 
       - name: Whitelist BBRv3 required KMI symbols
+        if: inputs.kmi_bypass == 'off'
         shell: bash
         run: |
           set -euo pipefail
