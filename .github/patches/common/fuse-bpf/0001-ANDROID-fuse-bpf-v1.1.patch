@@ -3829,7 +3829,7 @@ diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
 index 352b23fa0..a49360182 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -13,6 +13,10 @@
+@@ -13,6 +13,9 @@
  # define pr_fmt(fmt) "fuse: " fmt
  #endif
 +#include <linux/filter.h>
@@ -3839,7 +3839,7 @@ index 352b23fa0..a49360182 100644
  #include <linux/fuse.h>
  #include <linux/fs.h>
  #include <linux/mount.h>
-@@ -31,6 +34,10 @@
+@@ -31,6 +34,9 @@
  #include <linux/pid_namespace.h>
  #include <linux/refcount.h>
  #include <linux/user_namespace.h>
