@@ -49,6 +49,8 @@ runs:
           > "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
 
         echo "== attempting 3-way apply onto android12-5.10 =="
+        git config user.email "action@coreshift-gki2.local"
+        git config user.name "CoreShift-GKI2 CI"
         set +e
         git am --3way --whitespace=fix < "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
         APPLY_STATUS=$?
