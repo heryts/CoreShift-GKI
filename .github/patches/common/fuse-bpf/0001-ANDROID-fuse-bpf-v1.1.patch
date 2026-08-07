@@ -3830,12 +3830,11 @@ index 352b23fa0..a49360182 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
 @@ -13,6 +13,10 @@
-+#include <linux/filter.h>
  # define pr_fmt(fmt) "fuse: " fmt
  #endif
++#include <linux/filter.h>
  
 +#include <linux/android_fuse.h>
-+#include <linux/filter.h>
 +#include <linux/pagemap.h>
  #include <linux/fuse.h>
  #include <linux/fs.h>
@@ -5546,7 +5545,9 @@ new file mode 100644
 index 000000000..c6aa670bc
 --- /dev/null
 +++ b/kernel/bpf/bpf_fuse.c
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,130 @@
++#include <linux/bpf.h>
++#include <linux/bpf_verifier.h>
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2021 Google LLC
 +
@@ -5773,7 +5774,6 @@ index 000000000..5bf26eadd
 +#include <linux/unistd.h>
 +
 +#include <include/uapi/linux/fuse.h>
-+#include <linux/bpf.h>
 +
 +struct _test_options test_options;
 +
@@ -6851,7 +6851,6 @@ index 000000000..1b6f8c2ac
 +#include <linux/unistd.h>
 +
 +#include <include/uapi/linux/fuse.h>
-+#include <linux/bpf.h>
 +
 +bool user_messages;
 +bool kernel_messages;
@@ -7155,7 +7154,6 @@ index 000000000..c23f75be1
 +#include <linux/random.h>
 +
 +#include <include/uapi/linux/fuse.h>
-+#include <linux/bpf.h>
 +
 +static const char *ft_src = "ft-src";
 +static const char *ft_dst = "ft-dst";
