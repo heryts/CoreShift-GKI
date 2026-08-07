@@ -5749,7 +5749,7 @@ new file mode 100644
 index 000000000..5bf26eadd
 --- /dev/null
 +++ b/tools/testing/selftests/filesystems/fuse/bpf_loader.c
-@@ -0,0 +1,791 @@
+@@ -0,0 +1,790 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright 2021 Google LLC
