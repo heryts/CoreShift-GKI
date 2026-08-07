@@ -3829,7 +3829,7 @@ diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
 index 352b23fa0..a49360182 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -13,6 +13,9 @@
+@@ -13,6 +13,10 @@
  # define pr_fmt(fmt) "fuse: " fmt
  #endif
  
@@ -3840,7 +3840,7 @@ index 352b23fa0..a49360182 100644
  #include <linux/fuse.h>
  #include <linux/fs.h>
  #include <linux/mount.h>
-@@ -31,6 +34,9 @@
+@@ -31,6 +35,9 @@
  #include <linux/pid_namespace.h>
  #include <linux/refcount.h>
  #include <linux/user_namespace.h>
@@ -3850,7 +3850,7 @@ index 352b23fa0..a49360182 100644
  
  /** Default max number of pages that can be used in a single read request */
  #define FUSE_DEFAULT_MAX_PAGES_PER_REQ 32
-@@ -63,11 +69,57 @@ struct fuse_forget_link {
+@@ -63,11 +70,57 @@ struct fuse_forget_link {
  	struct fuse_forget_link *next;
  };
  
@@ -3908,7 +3908,7 @@ index 352b23fa0..a49360182 100644
  	/** Unique ID, which identifies the inode between userspace
  	 * and kernel */
  	u64 nodeid;
-@@ -239,6 +291,14 @@ struct fuse_file {
+@@ -239,6 +292,14 @@ struct fuse_file {
  	/** Container for data related to the passthrough functionality */
  	struct fuse_passthrough passthrough;
  
@@ -3923,7 +3923,7 @@ index 352b23fa0..a49360182 100644
  	/** RB node to be linked on fuse_conn->polled_files */
  	struct rb_node polled_node;
  
-@@ -270,6 +330,7 @@ struct fuse_page_desc {
+@@ -270,6 +331,7 @@ struct fuse_page_desc {
  struct fuse_args {
  	uint64_t nodeid;
  	uint32_t opcode;
@@ -3931,7 +3931,7 @@ index 352b23fa0..a49360182 100644
  	unsigned short in_numargs;
  	unsigned short out_numargs;
  	bool force:1;
-@@ -282,8 +343,8 @@ struct fuse_args {
+@@ -282,8 +344,8 @@ struct fuse_args {
  	bool page_zeroing:1;
  	bool page_replace:1;
  	bool may_block:1;
@@ -3942,7 +3942,7 @@ index 352b23fa0..a49360182 100644
  	void (*end)(struct fuse_mount *fm, struct fuse_args *args, int error);
  
  	/* Path used for completing d_canonical_path */
-@@ -520,9 +581,12 @@ struct fuse_fs_context {
+@@ -520,9 +582,12 @@ struct fuse_fs_context {
  	bool no_force_umount:1;
  	bool legacy_opts_show:1;
  	bool dax:1;
@@ -3955,7 +3955,7 @@ index 352b23fa0..a49360182 100644
  
  	/* DAX device, may be NULL */
  	struct dax_device *dax_dev;
-@@ -769,6 +833,15 @@ struct fuse_conn {
+@@ -769,6 +834,15 @@ struct fuse_conn {
  	/** Passthrough mode for read/write IO */
  	unsigned int passthrough:1;
  
@@ -3971,7 +3971,7 @@ index 352b23fa0..a49360182 100644
  	/** The number of requests waiting for completion */
  	atomic_t num_waiting;
  
-@@ -912,14 +985,18 @@ extern const struct dentry_operations fuse_dentry_operations;
+@@ -912,14 +986,18 @@ extern const struct dentry_operations fuse_dentry_operations;
  extern const struct dentry_operations fuse_root_dentry_operations;
  
  /**
@@ -3992,7 +3992,7 @@ index 352b23fa0..a49360182 100644
  
  /**
   * Send FORGET command
-@@ -956,7 +1033,6 @@ struct fuse_io_args {
+@@ -956,7 +1034,6 @@ struct fuse_io_args {
  void fuse_read_args_fill(struct fuse_io_args *ia, struct file *file, loff_t pos,
  			 size_t count, int opcode);
  
@@ -4000,7 +4000,7 @@ index 352b23fa0..a49360182 100644
  /**
   * Send OPEN or OPENDIR request
   */
-@@ -1025,7 +1101,7 @@ int fuse_dev_init(void);
+@@ -1025,7 +1102,7 @@ int fuse_dev_init(void);
  void fuse_dev_cleanup(void);
  
  int fuse_ctl_init(void);
@@ -4009,7 +4009,7 @@ index 352b23fa0..a49360182 100644
  
  /**
   * Simple request sending that does request allocation and freeing
-@@ -1053,6 +1129,7 @@ void fuse_invalidate_entry_cache(struct dentry *entry);
+@@ -1053,6 +1130,7 @@ void fuse_invalidate_entry_cache(struct dentry *entry);
  void fuse_invalidate_atime(struct inode *inode);
  
  u64 entry_attr_timeout(struct fuse_entry_out *o);
@@ -4017,7 +4017,7 @@ index 352b23fa0..a49360182 100644
  void fuse_change_entry_timeout(struct dentry *entry, struct fuse_entry_out *o);
  
  /**
-@@ -1260,6 +1337,7 @@ bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
+@@ -1260,6 +1338,7 @@ bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
  void fuse_dax_cancel_work(struct fuse_conn *fc);
  
  /* passthrough.c */
@@ -4025,7 +4025,7 @@ index 352b23fa0..a49360182 100644
  int fuse_passthrough_open(struct fuse_dev *fud, u32 lower_fd);
  int fuse_passthrough_setup(struct fuse_conn *fc, struct fuse_file *ff,
  			   struct fuse_open_out *openarg);
-@@ -1268,4 +1346,637 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb, struct iov_iter *to);
+@@ -1268,4 +1347,637 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb, struct iov_iter *to);
  ssize_t fuse_passthrough_write_iter(struct kiocb *iocb, struct iov_iter *from);
  ssize_t fuse_passthrough_mmap(struct file *file, struct vm_area_struct *vma);
  
@@ -5546,7 +5546,7 @@ new file mode 100644
 index 000000000..c6aa670bc
 --- /dev/null
 +++ b/kernel/bpf/bpf_fuse.c
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,129 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2021 Google LLC
 +
