@@ -307,6 +307,15 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: Save Reject Files if Fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuse-bpf-rej-files
+          path: |
+            **/*.rej
+          if-no-files-found: warn
+
       - name: Ensure expected Clang
         if: inputs.source_mode == 'maintained' || inputs.source_mode == 'custom'
         uses: ./.github/actions/ensure-expected-clang
