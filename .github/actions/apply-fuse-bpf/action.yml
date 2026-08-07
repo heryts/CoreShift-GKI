@@ -1,0 +1,90 @@
+name: "Apply FUSE-BPF (backport to android12-5.10)"
+description: >
+  Fetches the upstream ANDROID: fuse-bpf v1.1 squash commit from
+  common-android13-5.10 directly from android.googlesource.com/kernel/common
+  at build time, generates a real patch against its actual parent commit,
+  and applies it (3-way, falling back to --reject) onto the checked out
+  android12-5.10 kernel/common tree. Only meaningful for kernel_version=5.10;
+  android13+ based common trees (6.1/6.6) already contain FUSE_BPF natively.
+
+inputs:
+  kernel_version:
+    description: "Kernel version being built (only 5.10 is backported)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch and backport FUSE-BPF
+      if: inputs.kernel_version == '5.10'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+        UPSTREAM_URL="https://android.googlesource.com/kernel/common"
+        # ANDROID: fuse-bpf v1.1 squash, first landed on common-android13-5.10
+        TARGET_COMMIT="f5f4199c102aa676998b42abff60d071385c1c0c"
+        PATCH_DIR="$GITHUB_WORKSPACE/fuse-bpf-patch"
+
+        if [ ! -d "$COMMON_DIR/.git" ]; then
+          echo "::error::$COMMON_DIR is not a git checkout; FUSE-BPF backport needs real history to diff against"
+          exit 1
+        fi
+
+        mkdir -p "$PATCH_DIR"
+        cd "$COMMON_DIR"
+
+        echo "== fetching FUSE-BPF commit + its real parent from upstream common =="
+        # depth=2 gets the commit and its direct parent, enough to compute
+        # the exact diff that originally landed, without pulling all history.
+        if ! git fetch --no-tags --depth=2 "$UPSTREAM_URL" "$TARGET_COMMIT"; then
+          echo "::error::Could not fetch $TARGET_COMMIT from $UPSTREAM_URL. The Gerrit server may be blocking fetch-by-SHA (allowReachableSHA1InWant); try 'git fetch $UPSTREAM_URL refs/heads/android13-5.10' instead and adjust TARGET_COMMIT lookups."
+          exit 1
+        fi
+
+        echo "== generating patch relative to the commit's actual parent =="
+        git format-patch -1 FETCH_HEAD --stdout \
+          --patience \
+          > "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
+
+        echo "== attempting 3-way apply onto android12-5.10 =="
+        set +e
+        git am --3way --whitespace=fix < "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
+        APPLY_STATUS=$?
+        set -e
+
+        if [ "$APPLY_STATUS" -ne 0 ]; then
+          git am --abort 2>/dev/null || true
+          echo "::warning::3-way am failed cleanly; retrying with --reject so exact conflicts surface as .rej files"
+          set +e
+          git apply --reject --whitespace=fix "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
+          set -e
+
+          if find . -name '*.rej' | grep -q .; then
+            echo "::error::FUSE-BPF backport produced conflicts. Inspect *.rej files below, resolve them by hand in fs/fuse/, remove the .rej/.orig files, then re-run. The source patch is uploaded as an artifact for offline diffing."
+            find . -name '*.rej' -print
+            cp -r . "$PATCH_DIR/conflicted-tree" 2>/dev/null || true
+            exit 1
+          fi
+        fi
+
+        echo "== FUSE-BPF applied cleanly, enabling CONFIG_FUSE_BPF in defconfig =="
+        for f in arch/arm64/configs/gki_defconfig arch/x86/configs/gki_defconfig; do
+          if [ -f "$f" ] && ! grep -qxF "CONFIG_FUSE_BPF=y" "$f"; then
+            if grep -qxF "CONFIG_FUSE_FS=y" "$f"; then
+              sed -i '/^CONFIG_FUSE_FS=y$/a CONFIG_FUSE_BPF=y' "$f"
+            else
+              echo "CONFIG_FUSE_BPF=y" >> "$f"
+            fi
+            echo "enabled CONFIG_FUSE_BPF in $f"
+          fi
+        done
+
+        echo "fuse_bpf_applied=true" >> "$GITHUB_ENV"
+
+    - name: Skip FUSE-BPF (not kernel 5.10)
+      if: inputs.kernel_version != '5.10'
+      shell: bash
+      run: |
+        echo "::notice::fuse_bpf requested but kernel_version=${{ inputs.kernel_version }}; skipping backport (android13+ based common trees already ship FUSE_BPF natively for source_mode=google-lts)."
