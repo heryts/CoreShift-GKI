@@ -69,18 +69,6 @@ runs:
           fi
         fi
 
-        echo "== FUSE-BPF applied cleanly, enabling CONFIG_FUSE_BPF in defconfig =="
-        for f in arch/arm64/configs/gki_defconfig arch/x86/configs/gki_defconfig; do
-          if [ -f "$f" ] && ! grep -qxF "CONFIG_FUSE_BPF=y" "$f"; then
-            if grep -qxF "CONFIG_FUSE_FS=y" "$f"; then
-              sed -i '/^CONFIG_FUSE_FS=y$/a CONFIG_FUSE_BPF=y' "$f"
-            else
-              echo "CONFIG_FUSE_BPF=y" >> "$f"
-            fi
-            echo "enabled CONFIG_FUSE_BPF in $f"
-          fi
-        done
-
         echo "fuse_bpf_applied=true" >> "$GITHUB_ENV"
 
     - name: Skip FUSE-BPF (not kernel 5.10)
