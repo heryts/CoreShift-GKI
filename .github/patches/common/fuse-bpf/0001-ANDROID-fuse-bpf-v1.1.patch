@@ -6539,7 +6539,6 @@ index 000000000..5bf26eadd
 +	return result;
 +}
 +
-+
 diff --git a/tools/testing/selftests/filesystems/fuse/fd.txt b/tools/testing/selftests/filesystems/fuse/fd.txt
 new file mode 100644
 index 000000000..15ce77180
