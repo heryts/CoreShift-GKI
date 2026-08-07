@@ -309,11 +309,6 @@ jobs:
           enabled: "true"
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Apply FUSE-BPF support
-        uses: ./.github/actions/apply-fuse-bpf
-        with:
-          kernel_version: ${{ inputs.kernel_version }}
-
       - name: Init manager
         if: inputs.manager != 'Vanilla'
         uses: ./.github/actions/init-manager
