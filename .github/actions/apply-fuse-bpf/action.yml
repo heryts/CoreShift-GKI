@@ -25,7 +25,6 @@ runs:
         UPSTREAM_URL="https://android.googlesource.com/kernel/common"
         # ANDROID: fuse-bpf v1.1 squash, first landed on common-android13-5.10
         TARGET_COMMIT="f5f4199c102aa676998b42abff60d071385c1c0c"
-        PATCH_FILE="$GITHUB_WORKSPACE/.github/patches/common/fuse-bpf/0001-ANDROID-fuse-bpf-v1.1-android12-5.10.patch"
 
         if [ ! -d "$COMMON_DIR/.git" ]; then
           echo "::error::$COMMON_DIR is not a git checkout; FUSE-BPF backport needs real history to diff against"
@@ -36,7 +35,7 @@ runs:
         cd "$COMMON_DIR"
 
         echo "== applying FUSE-BPF patch =="
-        git apply --whitespace=fix "$PATCH_FILE"
+        git apply --whitespace=fix "$GITHUB_WORKSPACE/.github/patches/common/fuse-bpf/0001-ANDROID-fuse-bpf-v1.1-android12-5.10.patch"
         APPLY_STATUS=$?
 
         if [ "$APPLY_STATUS" -ne 0 ]; then
