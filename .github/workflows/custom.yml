@@ -309,7 +309,6 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: "DEBUG: dump fuse_fs_context struct"
-        if: inputs.fuse_bpf == 'on' && inputs.kernel_version == '5.10'
         shell: bash
         run: |
           COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
