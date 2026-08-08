@@ -25,7 +25,7 @@ runs:
         UPSTREAM_URL="https://android.googlesource.com/kernel/common"
         # ANDROID: fuse-bpf v1.1 squash, first landed on common-android13-5.10
         TARGET_COMMIT="f5f4199c102aa676998b42abff60d071385c1c0c"
-        PATCH_DIR="$GITHUB_WORKSPACE/fuse-bpf-patch"
+        PATCH_FILE="$GITHUB_WORKSPACE/.github/patches/common/fuse-bpf/0001-ANDROID-fuse-bpf-v1.1-android12-5.10.patch"
 
         if [ ! -d "$COMMON_DIR/.git" ]; then
           echo "::error::$COMMON_DIR is not a git checkout; FUSE-BPF backport needs real history to diff against"
@@ -35,26 +35,9 @@ runs:
         mkdir -p "$PATCH_DIR"
         cd "$COMMON_DIR"
 
-        echo "== fetching FUSE-BPF commit + its real parent from upstream common =="
-        # depth=2 gets the commit and its direct parent, enough to compute
-        # the exact diff that originally landed, without pulling all history.
-        if ! git fetch --no-tags --depth=2 "$UPSTREAM_URL" "$TARGET_COMMIT"; then
-          echo "::error::Could not fetch $TARGET_COMMIT from $UPSTREAM_URL. The Gerrit server may be blocking fetch-by-SHA (allowReachableSHA1InWant); try 'git fetch $UPSTREAM_URL refs/heads/android13-5.10' instead and adjust TARGET_COMMIT lookups."
-          exit 1
-        fi
-
-        echo "== generating patch relative to the commit's actual parent =="
-        git format-patch -1 FETCH_HEAD --stdout \
-          --patience \
-          > "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
-
-        echo "== attempting 3-way apply onto android12-5.10 =="
-        git config user.email "action@coreshift-gki2.local"
-        git config user.name "CoreShift-GKI2 CI"
-        set +e
-        git am --3way --whitespace=fix < "$PATCH_DIR/0001-ANDROID-fuse-bpf-v1.1-backport.patch"
+        echo "== applying FUSE-BPF patch =="
+        git apply --whitespace=fix "$PATCH_FILE"
         APPLY_STATUS=$?
-        set -e
 
         if [ "$APPLY_STATUS" -ne 0 ]; then
           git am --abort 2>/dev/null || true
