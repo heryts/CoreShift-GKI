@@ -308,6 +308,17 @@ jobs:
         with:
           kernel_version: ${{ inputs.kernel_version }}
 
+      - name: "DEBUG: dump fuse_fs_context struct"
+        if: inputs.fuse_bpf == 'on' && inputs.kernel_version == '5.10'
+        shell: bash
+        run: |
+          COMMON_DIR="${KERNEL_COMMON_DIR:-$GITHUB_WORKSPACE/kernel/common}"
+          echo "== struct fuse_fs_context in $COMMON_DIR/fs/fuse/fuse_i.h =="
+          grep -n -A 30 "struct fuse_fs_context" "$COMMON_DIR/fs/fuse/fuse_i.h" || echo "not found"
+          echo
+          echo "== every mention of ->fd / ->fudptr / ->file in fuse_i.h =="
+          grep -n "fd;\|fudptr\|->file\b" "$COMMON_DIR/fs/fuse/fuse_i.h" || echo "none found"
+
       - name: Save Reject Files if Fails
         if: failure()
         uses: actions/upload-artifact@v4
